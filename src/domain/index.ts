@@ -19,3 +19,27 @@ export {
   EARTH_PLANET_PARAMS,
   EARTH_TERRAIN_SOURCE,
 } from './planetParams';
+
+export type { GeoPoint, GridMap, LongitudeProfile, Months12, WindVector } from './gridMap';
+
+export type {
+  AirflowResult,
+  ClimateClassificationSystem,
+  ClimateZoneCode,
+  ClimateZoneRationale,
+  ClimateZoneResult,
+  CollisionPoint,
+  CollisionPointType,
+  CurrentClassification,
+  CurrentStreamline,
+  ITCZBand,
+  ITCZResult,
+  OceanCurrentResult,
+  PrecipitationLabel,
+  PrecipitationResult,
+  PressureCenter,
+  PressureCenterType,
+  SimulationResult,
+  TemperatureResult,
+  WindBeltResult,
+} from './stepResults';
