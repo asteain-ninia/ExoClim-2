@@ -3,3 +3,15 @@
 
 # ユーザーが docs/ に配置する一次資料の生 zip（展開版を docs/ 内ディレクトリで管理する）
 docs/*.zip
+
+# Node / Vite / Vitest
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+npm-debug.log*
+.DS_Store
+
+# 検証ハーネスの外部資産（[技術方針.md §2.3.2]）
+tests/fixtures-external/
