@@ -1,2 +1,5 @@
 # Claude Code ローカル設定（ユーザー固有）
 .claude/settings.local.json
+
+# ユーザーが docs/ に配置する一次資料の生 zip（展開版を docs/ 内ディレクトリで管理する）
+docs/*.zip
