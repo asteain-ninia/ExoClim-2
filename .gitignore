@@ -13,5 +13,8 @@ coverage/
 npm-debug.log*
 .DS_Store
 
+# TypeScript incremental build artifact（tsc -b 経由）
+tsconfig.tsbuildinfo
+
 # 検証ハーネスの外部資産（[技術方針.md §2.3.2]）
 tests/fixtures-external/

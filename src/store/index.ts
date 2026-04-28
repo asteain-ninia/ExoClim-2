@@ -1,4 +1,21 @@
 // 状態層エントリポイント。
-// Zustand store によるパラメータ・結果・UI 状態の保持（[技術方針.md §2.1.4] [要件定義書.md §5.4]）。
-// 実体は Phase 4-4 以降で順次追加。
-export {};
+// Zustand store によるパラメータ・結果・UI 状態の保持（[技術方針.md §2.1.4] / [要件定義書.md §5.4]）。
+
+export type { ParamsActions, ParamsState, ParamsStore } from './params';
+export { createParamsStore, useParamsStore } from './params';
+
+export type { ResultsActions, ResultsState, ResultsStore } from './results';
+export { createResultsStore, useResultsStore } from './results';
+
+export type {
+  CurrentStepView,
+  LegendVisibility,
+  SeasonPhaseView,
+  UIActions,
+  UIState,
+  UIStore,
+} from './ui';
+export { createUIStore, useUIStore } from './ui';
+
+export type { ConnectStoresOptions } from './connection';
+export { connectStoresToBridge } from './connection';
