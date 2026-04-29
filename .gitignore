@@ -18,3 +18,8 @@ tsconfig.tsbuildinfo
 
 # 検証ハーネスの外部資産（[技術方針.md §2.3.2]）
 tests/fixtures-external/
+
+# Playwright 出力（[開発ガイド.md §3.4]）
+test-results/
+playwright-report/
+playwright/.cache/
