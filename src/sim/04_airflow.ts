@@ -22,6 +22,7 @@
 
 import type {
   AirflowResult,
+  GeoPoint,
   Grid,
   GridMap,
   ITCZResult,
@@ -60,14 +61,32 @@ export interface AirflowStepParams {
   readonly pressureGradientCoefficient: number;
   /**
    * 山脈偏向のしきい値（メートル）。標高 > この値のセルで mountainDeflectionApplied を true にする。
-   * 実際の風流路偏向は最小実装では未適用（[docs/spec/04_気流.md §4.6]）。
+   * 山脈の風下側（rainshadow）の風成分を法線方向に減衰させる（[docs/spec/04_気流.md §4.6]）。
    */
   readonly mountainDeflectionThresholdMeters: number;
+  /**
+   * 気圧中心検出のしきい値（hPa）。帯状平均からの偏差絶対値がこの値以上で
+   * 連結成分が `pressureCenterMinAreaDeg2` 以上のとき高/低気圧中心として検出する。
+   */
+  readonly pressureCenterThresholdHpa: number;
+  /**
+   * 気圧中心検出の最小連結面積（度²）。これ未満の連結成分はノイズ扱いで無視する。
+   * 1° 解像度で 25 ≈ 5°×5° の塊以上を検出。
+   */
+  readonly pressureCenterMinAreaDeg2: number;
+  /**
+   * モンスーン領域での風向反転強度（0〜1）。1 で夏に完全に風向反転、
+   * 0 で反転なし。卓越風 + 地衡風成分に対して `1 - 2 * strength` を乗算する形で適用。
+   */
+  readonly monsoonReversalStrength: number;
 }
 
 export const DEFAULT_AIRFLOW_STEP_PARAMS: AirflowStepParams = {
   pressureGradientCoefficient: 1,
   mountainDeflectionThresholdMeters: 2000,
+  pressureCenterThresholdHpa: 2,
+  pressureCenterMinAreaDeg2: 25,
+  monsoonReversalStrength: 1,
 };
 
 /**
@@ -124,6 +143,194 @@ function geostrophicComponent(
 }
 
 /**
+ * 帯状（経度方向）平均からの偏差の連結成分を抽出し、各成分の質量中心と最大強度を
+ * 気圧中心として返す。
+ *
+ * 設計意図:
+ *   - 圧力 anomaly = (zonal pattern) + (continental + その他局地寄与)。zonal pattern は
+ *     帯状ベルトであり「点状の中心」ではないので、帯状平均を引いて純粋な局地寄与だけ残す。
+ *   - 連結成分は経度方向の wraparound を許容（東経 +180° と -180° は隣接）。
+ *   - 経度の質量中心は単純平均すると wrap で破綻するので、円平均（cos/sin の重み付き和）で求める。
+ *
+ * 強度しきい値・最小面積はパラメータとして外部から差し込み、Pasta が定量指定しない部分の
+ * チューニングを利用者に開放する（[docs/spec/04_気流.md §6.1]）。
+ */
+function detectPressureCenters(
+  pressureAnomalyHpa: GridMap<number>,
+  grid: Grid,
+  thresholdHpa: number,
+  minAreaDeg2: number,
+): PressureCenter[] {
+  const rows = grid.latitudeCount;
+  const cols = grid.longitudeCount;
+  const minCells = Math.max(
+    4,
+    Math.round(minAreaDeg2 / (grid.resolutionDeg * grid.resolutionDeg)),
+  );
+
+  // 1. 帯状平均（緯度別）
+  const zonalMeanByRow = new Array<number>(rows);
+  for (let i = 0; i < rows; i++) {
+    const row = pressureAnomalyHpa[i];
+    let sum = 0;
+    let count = 0;
+    if (row) {
+      for (let j = 0; j < cols; j++) {
+        sum += row[j] ?? 0;
+        count++;
+      }
+    }
+    zonalMeanByRow[i] = count > 0 ? sum / count : 0;
+  }
+
+  // 2. 偏差マップ
+  const deviation: number[][] = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    const row = pressureAnomalyHpa[i];
+    const devRow = new Array<number>(cols);
+    const zMean = zonalMeanByRow[i] ?? 0;
+    for (let j = 0; j < cols; j++) {
+      devRow[j] = (row?.[j] ?? 0) - zMean;
+    }
+    deviation[i] = devRow;
+  }
+
+  // 3. 連結成分ラベリング（経度 wraparound あり）+ 中心抽出
+  const visited: boolean[][] = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    visited[i] = new Array<boolean>(cols).fill(false);
+  }
+  const centers: PressureCenter[] = [];
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      if (visited[i]![j]) continue;
+      const v = deviation[i]![j]!;
+      if (Math.abs(v) < thresholdHpa) {
+        visited[i]![j] = true;
+        continue;
+      }
+      const positive = v > 0;
+      // BFS
+      const stack: Array<[number, number]> = [[i, j]];
+      const cellList: Array<{ readonly i: number; readonly j: number; readonly v: number }> = [];
+      while (stack.length > 0) {
+        const popped = stack.pop()!;
+        const ci = popped[0]!;
+        const cjRaw = popped[1]!;
+        if (ci < 0 || ci >= rows) continue;
+        const cj = ((cjRaw % cols) + cols) % cols;
+        if (visited[ci]![cj]) continue;
+        const cv = deviation[ci]![cj]!;
+        const sameSign = positive ? cv > thresholdHpa : cv < -thresholdHpa;
+        if (!sameSign) continue;
+        visited[ci]![cj] = true;
+        cellList.push({ i: ci, j: cj, v: cv });
+        stack.push([ci + 1, cj]);
+        stack.push([ci - 1, cj]);
+        stack.push([ci, cj + 1]);
+        stack.push([ci, cj - 1]);
+      }
+      if (cellList.length < minCells) continue;
+      // 重心（緯度は単純平均、経度は円平均）と最大強度
+      let sumLatW = 0;
+      let sumLonX = 0;
+      let sumLonY = 0;
+      let sumW = 0;
+      let maxAbs = 0;
+      for (const c of cellList) {
+        const cell = grid.cells[c.i]?.[c.j];
+        if (!cell) continue;
+        const w = Math.abs(c.v);
+        sumLatW += cell.latitudeDeg * w;
+        const lonRad = cell.longitudeDeg * DEG_TO_RAD;
+        sumLonX += w * Math.cos(lonRad);
+        sumLonY += w * Math.sin(lonRad);
+        sumW += w;
+        if (w > maxAbs) maxAbs = w;
+      }
+      if (sumW <= 0) continue;
+      const meanLat = sumLatW / sumW;
+      const meanLonRad = Math.atan2(sumLonY, sumLonX);
+      const meanLonDeg = meanLonRad / DEG_TO_RAD;
+      const position: GeoPoint = { latitudeDeg: meanLat, longitudeDeg: meanLonDeg };
+      centers.push({
+        type: positive ? 'high' : 'low',
+        position,
+        intensityHpa: maxAbs,
+      });
+    }
+  }
+  return centers;
+}
+
+/**
+ * 山脈による風流路偏向（[docs/spec/04_気流.md §4.6]）。
+ *
+ * 山脈セル（mountainDeflectionApplied=true）から風下方向を判定し、風下側 1 セル隣の
+ * 風成分のうち「山脈に直交する成分（法線成分）」を減衰させる。これで、流れが山脈を
+ * 横切る代わりに山脈に沿って迂回する効果が出る。
+ *
+ * 山脈の向き判定は最小実装として「南北方向（u 法線）」と「東西方向（v 法線）」のうち
+ * 連続する山脈セル数が多い方向を採用。陸地連結性まで踏み込まず、各山脈セル単位で
+ * 局所的に判定する。
+ *
+ * Pasta は具体係数を指定しない（§7.4 未確定論点）ので、減衰率は法線成分を半分に下げる。
+ */
+function applyMountainDeflection(
+  windField: WindVector[][],
+  mountainMask: boolean[][],
+  rows: number,
+  cols: number,
+): void {
+  const NORMAL_DAMPING = 0.5;
+  const isMountain = (i: number, j: number): boolean => {
+    if (i < 0 || i >= rows) return false;
+    const jj = ((j % cols) + cols) % cols;
+    return !!mountainMask[i]?.[jj];
+  };
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      if (!mountainMask[i]?.[j]) continue;
+      // 連続する山脈セル数: 東西方向と南北方向
+      let nsRun = 1;
+      if (isMountain(i + 1, j)) nsRun++;
+      if (isMountain(i - 1, j)) nsRun++;
+      let ewRun = 1;
+      if (isMountain(i, j + 1)) ewRun++;
+      if (isMountain(i, j - 1)) ewRun++;
+      // 風下側 1 セル隣の風成分を減衰
+      const wind = windField[i]?.[j];
+      if (!wind) continue;
+      // 風下方向（風が吹いていく方向）の隣セルを更新
+      const downstreamJ = wind.uMps > 0 ? j + 1 : j - 1;
+      const downstreamI = wind.vMps > 0 ? i + 1 : i - 1;
+      // 南北方向に伸びる山脈は東西成分（u）を減衰
+      if (nsRun >= ewRun) {
+        const target = windField[i]?.[((downstreamJ % cols) + cols) % cols];
+        if (target) {
+          windField[i]![((downstreamJ % cols) + cols) % cols] = {
+            uMps: target.uMps * NORMAL_DAMPING,
+            vMps: target.vMps,
+          };
+        }
+      }
+      // 東西方向に伸びる山脈は南北成分（v）を減衰
+      if (ewRun > nsRun) {
+        if (downstreamI >= 0 && downstreamI < rows) {
+          const target = windField[downstreamI]?.[j];
+          if (target) {
+            windField[downstreamI]![j] = {
+              uMps: target.uMps,
+              vMps: target.vMps * NORMAL_DAMPING,
+            };
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
  * Step 4 気流 純粋関数。
  *
  * 入力: PlanetParams + Grid + ITCZResult + WindBeltResult + OceanCurrentResult + params。
@@ -134,10 +341,10 @@ function geostrophicComponent(
 export function computeAirflow(
   planet: PlanetParams,
   grid: Grid,
-  // ITCZResult / OceanCurrentResult は最小実装では未使用だが、契約として受け取る。
-  // 将来 §4.1 海洋ジャイア中心利用 や ITCZ 連動のモンスーン反転で活用する。
-  _itczResult: ITCZResult,
+  itczResult: ITCZResult,
   windBeltResult: WindBeltResult,
+  // OceanCurrentResult は最小実装では未使用だが、契約として受け取る。
+  // 将来 §4.1 海洋ジャイア中心利用 で参照する。
   _oceanCurrentResult: OceanCurrentResult,
   params: AirflowStepParams = DEFAULT_AIRFLOW_STEP_PARAMS,
 ): AirflowResult {
@@ -160,6 +367,18 @@ export function computeAirflow(
   const computeMonth = (m: number) => {
     const prevailingWind = windBeltResult.monthlyPrevailingWind[m];
     const pressureMap = windBeltResult.monthlySurfacePressureHpa[m];
+    const monsoonMask = windBeltResult.monthlyMonsoonMask[m];
+    // モンスーン反転: 夏半球で吹く向きを反転。ITCZ 月別中心線の経度平均（declination 相当）で
+    // 半球を判定する（[docs/spec/04_気流.md §4.8]）。
+    const monthBands = itczResult.monthlyBands[m];
+    let declinationDeg = 0;
+    if (monthBands && monthBands.length > 0) {
+      let sum = 0;
+      for (const b of monthBands) sum += b.centerLatitudeDeg;
+      declinationDeg = sum / monthBands.length;
+    }
+    const declSign = Math.sign(declinationDeg);
+    const monsoonFactor = 1 - 2 * params.monsoonReversalStrength;
     const windField: WindVector[][] = new Array(latitudeCount);
     const pressureAnomaly: number[][] = new Array(latitudeCount);
 
@@ -177,6 +396,7 @@ export function computeAirflow(
       const cellRow = grid.cells[i];
       const prevailRow = prevailingWind[i];
       const pressureRow = pressureMap[i];
+      const monsoonRow = monsoonMask?.[i];
       const windRow: WindVector[] = new Array(longitudeCount);
       const anomalyRow: number[] = new Array(longitudeCount);
 
@@ -201,6 +421,15 @@ export function computeAirflow(
           continue;
         }
 
+        // モンスーン反転: 夏半球の monsoon mask セルで卓越風を反転（強度 0〜1）
+        let prevU = prev.uMps;
+        let prevV = prev.vMps;
+        const isMonsoon = monsoonRow?.[j] === true;
+        if (isMonsoon && declSign !== 0 && Math.sign(cell.latitudeDeg) === declSign) {
+          prevU *= monsoonFactor;
+          prevV *= monsoonFactor;
+        }
+
         // 地衡風成分を加算
         const geo = geostrophicComponent(
           pressureMap,
@@ -214,14 +443,22 @@ export function computeAirflow(
           params.pressureGradientCoefficient,
         );
         windRow[j] = {
-          uMps: prev.uMps + geo.uMps,
-          vMps: prev.vMps + geo.vMps,
+          uMps: prevU + geo.uMps,
+          vMps: prevV + geo.vMps,
         };
       }
 
       windField[i] = windRow;
       pressureAnomaly[i] = anomalyRow;
     }
+
+    // 山脈による風下側風成分の偏向（法線成分減衰）
+    applyMountainDeflection(
+      windField,
+      mountainDeflectionApplied,
+      latitudeCount,
+      longitudeCount,
+    );
 
     return { windField, pressureAnomaly };
   };
@@ -239,12 +476,19 @@ export function computeAirflow(
     months[8]!.pressureAnomaly, months[9]!.pressureAnomaly, months[10]!.pressureAnomaly, months[11]!.pressureAnomaly,
   ];
 
-  // 圧力中心は最小実装では空配列（[docs/spec/04_気流.md §4.1〜§4.4] の検出ロジックは将来）
-  const emptyCenters: ReadonlyArray<PressureCenter> = [];
+  // 圧力中心: 月別に帯状偏差ベースの連結成分検出で導出
+  const monthlyCentersArr: Array<ReadonlyArray<PressureCenter>> = months.map((mo) =>
+    detectPressureCenters(
+      mo.pressureAnomaly,
+      grid,
+      params.pressureCenterThresholdHpa,
+      params.pressureCenterMinAreaDeg2,
+    ),
+  );
   const monthlyPressureCenters: Months12<ReadonlyArray<PressureCenter>> = [
-    emptyCenters, emptyCenters, emptyCenters, emptyCenters,
-    emptyCenters, emptyCenters, emptyCenters, emptyCenters,
-    emptyCenters, emptyCenters, emptyCenters, emptyCenters,
+    monthlyCentersArr[0]!, monthlyCentersArr[1]!, monthlyCentersArr[2]!, monthlyCentersArr[3]!,
+    monthlyCentersArr[4]!, monthlyCentersArr[5]!, monthlyCentersArr[6]!, monthlyCentersArr[7]!,
+    monthlyCentersArr[8]!, monthlyCentersArr[9]!, monthlyCentersArr[10]!, monthlyCentersArr[11]!,
   ];
 
   return {

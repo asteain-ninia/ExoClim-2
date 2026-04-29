@@ -19,6 +19,7 @@ import type {
   GridMap,
   ITCZResult,
   OceanCurrentResult,
+  PressureCenter,
   WindVector,
 } from '@/domain';
 import { useParamsStore } from '@/store/params';
@@ -494,6 +495,36 @@ function drawOverlayBitmap(
   ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
+/** Step 4 の気圧中心（H = 高気圧 / L = 低気圧）を文字マーカーで描く。 */
+function drawPressureCenters(
+  ctx: CanvasRenderingContext2D,
+  centers: ReadonlyArray<PressureCenter>,
+  normPanPx: number,
+): void {
+  ctx.font = 'bold 16px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+    for (const center of centers) {
+      const { x, y } = projectRaw(
+        center.position.latitudeDeg,
+        center.position.longitudeDeg,
+        VIEWPORT,
+        drawOffset,
+      );
+      if (x < -20 || x > CANVAS_WIDTH_PX + 20) continue;
+      const isHigh = center.type === 'high';
+      const label = isHigh ? 'H' : 'L';
+      const color = isHigh ? '#f04040' : '#4090f0';
+      // 影で輪郭を出す
+      ctx.fillStyle = '#000000';
+      ctx.fillText(label, x + 1, y + 1);
+      ctx.fillStyle = color;
+      ctx.fillText(label, x, y);
+    }
+  }
+}
+
 /** 最終地表風（Step 4）を Step 2 と同じ格子点に色違い（黄系）の矢印で描く。 */
 function drawFinalWindVectors(
   ctx: CanvasRenderingContext2D,
@@ -652,6 +683,7 @@ function drawMap(
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
   finalWindField: GridMap<WindVector> | null,
+  pressureCenters: ReadonlyArray<PressureCenter> | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -691,6 +723,9 @@ function drawMap(
   }
   if (legendVisibility.finalWindVectors && finalWindField && grid) {
     drawFinalWindVectors(ctx, finalWindField, grid, norm);
+  }
+  if (legendVisibility.pressureCenters && pressureCenters && pressureCenters.length > 0) {
+    drawPressureCenters(ctx, pressureCenters, norm);
   }
 }
 
@@ -745,6 +780,26 @@ export function MapCanvas() {
     const monthIndex = currentSeason === 'annual' ? null : currentSeason;
     return buildPressureAnomalyBitmap(airflow, monthIndex, grid);
   }, [airflow, currentSeason, grid]);
+
+  // Step 4 の気圧中心（年平均は最強月を採用、月別はその月）
+  const pressureCenters = useMemo<ReadonlyArray<PressureCenter> | null>(() => {
+    if (!airflow) return null;
+    if (currentSeason === 'annual') {
+      // 年平均では「12 ヶ月のうち最も強かった月」を採用。月毎に切り替わる中心の見やすさを優先。
+      let bestMonth = 0;
+      let bestSum = -Infinity;
+      for (let m = 0; m < airflow.monthlyPressureCenters.length; m++) {
+        let sum = 0;
+        for (const c of airflow.monthlyPressureCenters[m] ?? []) sum += c.intensityHpa;
+        if (sum > bestSum) {
+          bestSum = sum;
+          bestMonth = m;
+        }
+      }
+      return airflow.monthlyPressureCenters[bestMonth] ?? null;
+    }
+    return airflow.monthlyPressureCenters[currentSeason] ?? null;
+  }, [airflow, currentSeason]);
 
   // Step 4 の最終地表風（年平均は 12 ヶ月平均、月別はその月）
   const finalWindField = useMemo<GridMap<WindVector> | null>(() => {
@@ -857,6 +912,7 @@ export function MapCanvas() {
       bands,
       windField,
       finalWindField,
+      pressureCenters,
       grid,
       legendVisibility,
     );
@@ -870,6 +926,7 @@ export function MapCanvas() {
     bands,
     windField,
     finalWindField,
+    pressureCenters,
     grid,
     legendVisibility,
   ]);

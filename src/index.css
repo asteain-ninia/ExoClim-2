@@ -201,6 +201,25 @@ body {
   width: 12px;
 }
 
+.legend-swatch--pressure-center {
+  background: transparent;
+  border-color: #f0e070;
+  position: relative;
+}
+
+.legend-swatch--pressure-center::before {
+  content: 'H';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f0e070;
+  font-weight: bold;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
 .legend-swatch--wind::before {
   content: '→';
   position: absolute;

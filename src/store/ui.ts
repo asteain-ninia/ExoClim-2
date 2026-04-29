@@ -37,6 +37,8 @@ export interface LegendVisibility {
   readonly finalWindVectors: boolean;
   /** Step 4 気流の圧力 anomaly ヒートマップ表示トグル。 */
   readonly pressureAnomaly: boolean;
+  /** Step 4 気流の気圧中心マーカー（H / L）表示トグル。 */
+  readonly pressureCenters: boolean;
 }
 
 export interface UIState {
@@ -66,6 +68,7 @@ const INITIAL_UI_STATE: UIState = {
     seaIce: true,
     finalWindVectors: true,  // Step 4 final wind（既定 ON）
     pressureAnomaly: false,  // 圧力 anomaly ヒートマップ（既定 OFF、利用者が必要時に ON）
+    pressureCenters: true,   // 気圧中心 H / L マーカー（既定 ON、地形と相関した anomaly 中心を直感化）
   },
 };
 

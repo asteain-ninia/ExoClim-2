@@ -80,8 +80,8 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
   test('TerrainSource: プリセット切替で Canvas 描画が変わる', async ({ page }) => {
     const beforeEarth = await canvasFingerprint(page);
     await page.getByTestId('terrain-preset-id').selectOption('no_land');
-    // 地形再生成 + pipeline 再実行を待つ
-    await page.waitForTimeout(300);
+    // 地形再生成 + pipeline 再実行を待つ。P4-8 で Step 4 計算が重くなったため待機を延長
+    await page.waitForTimeout(800);
     const afterNoLand = await canvasFingerprint(page);
     expect(afterNoLand).not.toBe(beforeEarth);
   });

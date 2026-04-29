@@ -57,18 +57,23 @@ test.describe('P4-8: Step 4 気流', () => {
     await page.waitForTimeout(200);
   });
 
-  test('Step 4 気流パネル（2 スライダー）が表示される', async ({ page }) => {
+  test('Step 4 気流パネル（4 スライダー）が表示される', async ({ page }) => {
     await expect(page.getByTestId('param-group-airflow')).toBeVisible();
     await expect(page.getByTestId('slider-airflow-pressure-gradient')).toBeVisible();
     await expect(page.getByTestId('slider-airflow-mountain-threshold')).toBeVisible();
+    await expect(page.getByTestId('slider-airflow-monsoon-reversal')).toBeVisible();
+    await expect(page.getByTestId('slider-airflow-pressure-center-threshold')).toBeVisible();
   });
 
-  test('凡例に「最終地表風」「圧力 anomaly」トグルが表示される', async ({ page }) => {
+  test('凡例に「最終地表風」「圧力 anomaly」「気圧中心」トグルが表示される', async ({ page }) => {
     await expect(page.getByTestId('legend-final-wind')).toBeVisible();
     await expect(page.getByTestId('legend-final-wind')).toBeChecked();
     await expect(page.getByTestId('legend-pressure-anomaly')).toBeVisible();
     // 圧力 anomaly は既定 OFF
     await expect(page.getByTestId('legend-pressure-anomaly')).not.toBeChecked();
+    await expect(page.getByTestId('legend-pressure-centers')).toBeVisible();
+    // 気圧中心は既定 ON
+    await expect(page.getByTestId('legend-pressure-centers')).toBeChecked();
   });
 
   test('圧力 anomaly トグルを ON にすると Canvas 描画が変わる', async ({ page }) => {
@@ -92,5 +97,27 @@ test.describe('P4-8: Step 4 気流', () => {
   test('Step 4 気流既定値が表示される', async ({ page }) => {
     await expect(page.getByTestId('slider-airflow-pressure-gradient')).toHaveValue('1');
     await expect(page.getByTestId('slider-airflow-mountain-threshold')).toHaveValue('2000');
+    await expect(page.getByTestId('slider-airflow-monsoon-reversal')).toHaveValue('1');
+    await expect(page.getByTestId('slider-airflow-pressure-center-threshold')).toHaveValue('2');
+  });
+
+  test('気圧中心トグルを OFF にすると Canvas 描画が変わる（H/L マーカーが消える）', async ({
+    page,
+  }) => {
+    const before = await canvasFingerprint(page);
+    await page.getByTestId('legend-pressure-centers').uncheck();
+    await page.waitForTimeout(150);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
+
+  test('モンスーン反転 強度を 0 に下げると Canvas 描画が変わる（夏半球 monsoon mask の風が変化）', async ({
+    page,
+  }) => {
+    const before = await canvasFingerprint(page);
+    await setRangeValue(page, 'slider-airflow-monsoon-reversal', '0');
+    await page.waitForTimeout(500);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
   });
 });

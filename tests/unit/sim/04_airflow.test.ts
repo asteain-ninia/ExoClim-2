@@ -263,3 +263,223 @@ describe('sim/04_airflow: 決定性（[要件定義書.md §3.2]）', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('sim/04_airflow: 圧力中心検出（[docs/spec/04_気流.md §4.1〜§4.4]）', () => {
+  it('全海洋では帯状偏差がほぼ 0 となり中心は検出されない', () => {
+    const grid = baseGrid(2);
+    const result = computeAirflow(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+      baseOcean(EARTH_PLANET_PARAMS, grid),
+    );
+    for (const month of result.monthlyPressureCenters) {
+      expect(month.length).toBe(0);
+    }
+  });
+
+  it('NH 経度 0-90° 陸地で 7 月に低気圧中心が検出される（夏の大陸低気圧）', () => {
+    const halfLandGrid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 && cell.longitudeDeg <= 90 && cell.latitudeDeg > 0
+        ? { ...cell, isLand: true, continentId: 'nh-east' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, halfLandGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, halfLandGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, halfLandGrid);
+    const result = computeAirflow(EARTH_PLANET_PARAMS, halfLandGrid, itcz, wind, ocean);
+    const julyCenters = result.monthlyPressureCenters[6];
+    const lows = julyCenters.filter((c) => c.type === 'low');
+    expect(lows.length).toBeGreaterThan(0);
+    // 北半球の陸地中央付近（lat > 0、lon 0-90°）に検出される
+    const continentalLow = lows.find(
+      (c) =>
+        c.position.latitudeDeg > 0 &&
+        c.position.latitudeDeg < 60 &&
+        c.position.longitudeDeg > 0 &&
+        c.position.longitudeDeg < 90,
+    );
+    expect(continentalLow).toBeDefined();
+  });
+
+  it('intensityHpa は正の値（|anomaly_dev| 最大値）', () => {
+    const halfLandGrid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 && cell.longitudeDeg <= 90 && cell.latitudeDeg > 0
+        ? { ...cell, isLand: true, continentId: 'nh-east' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, halfLandGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, halfLandGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, halfLandGrid);
+    const result = computeAirflow(EARTH_PLANET_PARAMS, halfLandGrid, itcz, wind, ocean);
+    for (const month of result.monthlyPressureCenters) {
+      for (const center of month) {
+        expect(center.intensityHpa).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('しきい値を上げると検出数が減る（パラメータが効く）', () => {
+    const halfLandGrid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 && cell.longitudeDeg <= 90 && cell.latitudeDeg > 0
+        ? { ...cell, isLand: true, continentId: 'nh-east' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, halfLandGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, halfLandGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, halfLandGrid);
+    const lowThreshold = computeAirflow(EARTH_PLANET_PARAMS, halfLandGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureCenterThresholdHpa: 0.5,
+    });
+    const highThreshold = computeAirflow(EARTH_PLANET_PARAMS, halfLandGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureCenterThresholdHpa: 100,
+    });
+    const lowCount = lowThreshold.monthlyPressureCenters.reduce((s, m) => s + m.length, 0);
+    const highCount = highThreshold.monthlyPressureCenters.reduce((s, m) => s + m.length, 0);
+    expect(lowCount).toBeGreaterThan(highCount);
+    expect(highCount).toBe(0);
+  });
+});
+
+describe('sim/04_airflow: 山脈による風流路の偏向（[docs/spec/04_気流.md §4.6]）', () => {
+  it('南北方向に並ぶ山脈の風下側 1 セルで u 成分が減衰', () => {
+    // lon = -1° / +1° の 2 列に NH 全緯度の山脈（南北方向の連続列）。
+    // Hadley 帯（lat 11°）では u が西向き（負）なので風下は j-1（西側、lon = -3°）。
+    const ridgeGrid = mapGridCells(baseGrid(2), (cell) =>
+      Math.abs(cell.longitudeDeg) <= 1 && cell.latitudeDeg > 0
+        ? { ...cell, isLand: true, elevationMeters: 5000, continentId: 'ridge' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, ridgeGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, ridgeGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, ridgeGrid);
+    const baseline = computeAirflow(EARTH_PLANET_PARAMS, ridgeGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      mountainDeflectionThresholdMeters: 99999, // 偏向無効
+    });
+    const deflected = computeAirflow(EARTH_PLANET_PARAMS, ridgeGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      mountainDeflectionThresholdMeters: 2000, // 偏向有効
+    });
+    // 山脈の lon=-1° 隣接（風下）の Hadley（lat=11°）セルを比較
+    // i = round((10+90)/2 - 0.5) = 50 → lat = -90 + 50.5*2 = 11°（Hadley、u 負）
+    const i = Math.round((10 + 90) / ridgeGrid.resolutionDeg - 0.5);
+    // u が負（西向き、Hadley NH）なので風下は j-1。lon = -3° のセルを見る。
+    const j = Math.round((-3 + 180) / ridgeGrid.resolutionDeg - 0.5);
+    const baseU = Math.abs(baseline.monthlyWindField[0]?.[i]?.[j]?.uMps ?? 0);
+    const deflU = Math.abs(deflected.monthlyWindField[0]?.[i]?.[j]?.uMps ?? 0);
+    expect(deflU).toBeLessThan(baseU);
+  });
+
+  it('しきい値が高すぎる山脈無し planet でも全 12 ヶ月で NaN を出さない', () => {
+    const grid = baseGrid(2);
+    const result = computeAirflow(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+      baseOcean(EARTH_PLANET_PARAMS, grid),
+      { ...DEFAULT_AIRFLOW_STEP_PARAMS, mountainDeflectionThresholdMeters: 99999 },
+    );
+    for (const monthField of result.monthlyWindField) {
+      for (const row of monthField) {
+        for (const wind of row) {
+          expect(Number.isFinite(wind.uMps)).toBe(true);
+          expect(Number.isFinite(wind.vMps)).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+describe('sim/04_airflow: モンスーン領域での風向反転（[docs/spec/04_気流.md §4.8]）', () => {
+  it('monsoonReversalStrength=0 と =1 で夏半球の monsoon mask セルの風向が逆になる', () => {
+    // ITCZ がよく振れる地球プリセット + 大陸を NH 赤道直交近くに置くことで monsoon mask を発生させる
+    const monsoonGrid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 &&
+      cell.longitudeDeg <= 90 &&
+      cell.latitudeDeg > -10 &&
+      cell.latitudeDeg < 30
+        ? { ...cell, isLand: true, continentId: 'monsoon' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, monsoonGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, monsoonGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, monsoonGrid);
+    // 7 月 (NH 夏)、地衡風寄与は 0 にして卓越風だけで比較
+    const noReversal = computeAirflow(EARTH_PLANET_PARAMS, monsoonGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureGradientCoefficient: 0,
+      monsoonReversalStrength: 0,
+    });
+    const fullReversal = computeAirflow(EARTH_PLANET_PARAMS, monsoonGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureGradientCoefficient: 0,
+      monsoonReversalStrength: 1,
+    });
+    // monsoon マスクが立つ陸地セルを探す
+    const julyMonsoon = wind.monthlyMonsoonMask[6]!;
+    let reversed = false;
+    for (let i = 0; i < monsoonGrid.latitudeCount; i++) {
+      const monsoonRow = julyMonsoon[i];
+      if (!monsoonRow) continue;
+      for (let j = 0; j < monsoonGrid.longitudeCount; j++) {
+        if (!monsoonRow[j]) continue;
+        const a = noReversal.monthlyWindField[6]?.[i]?.[j];
+        const b = fullReversal.monthlyWindField[6]?.[i]?.[j];
+        if (!a || !b) continue;
+        // u 成分の符号反転 or v 成分の符号反転を確認
+        if (
+          (Math.abs(a.uMps) > 0.1 && Math.sign(a.uMps) !== Math.sign(b.uMps)) ||
+          (Math.abs(a.vMps) > 0.1 && Math.sign(a.vMps) !== Math.sign(b.vMps))
+        ) {
+          reversed = true;
+          break;
+        }
+      }
+      if (reversed) break;
+    }
+    expect(reversed).toBe(true);
+  });
+
+  it('monsoon mask が立たない冬半球（NH 1 月）では風が変わらない', () => {
+    const monsoonGrid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 &&
+      cell.longitudeDeg <= 90 &&
+      cell.latitudeDeg > -10 &&
+      cell.latitudeDeg < 30
+        ? { ...cell, isLand: true, continentId: 'monsoon' }
+        : cell,
+    );
+    const itcz = baseITCZ(EARTH_PLANET_PARAMS, monsoonGrid);
+    const wind = baseWindBelt(EARTH_PLANET_PARAMS, monsoonGrid);
+    const ocean = baseOcean(EARTH_PLANET_PARAMS, monsoonGrid);
+    const noReversal = computeAirflow(EARTH_PLANET_PARAMS, monsoonGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureGradientCoefficient: 0,
+      monsoonReversalStrength: 0,
+    });
+    const fullReversal = computeAirflow(EARTH_PLANET_PARAMS, monsoonGrid, itcz, wind, ocean, {
+      ...DEFAULT_AIRFLOW_STEP_PARAMS,
+      pressureGradientCoefficient: 0,
+      monsoonReversalStrength: 1,
+    });
+    // 1 月（declSign = -1、SH 夏）。NH の monsoon マスク陸地（lat > 0）は冬側なので反転されない
+    for (let i = 0; i < monsoonGrid.latitudeCount; i++) {
+      const cellRow = monsoonGrid.cells[i];
+      if (!cellRow) continue;
+      for (let j = 0; j < monsoonGrid.longitudeCount; j++) {
+        const cell = cellRow[j];
+        if (!cell || !cell.isLand || cell.latitudeDeg <= 0) continue;
+        const a = noReversal.monthlyWindField[0]?.[i]?.[j];
+        const b = fullReversal.monthlyWindField[0]?.[i]?.[j];
+        if (!a || !b) continue;
+        expect(a.uMps).toBeCloseTo(b.uMps, 6);
+        expect(a.vMps).toBeCloseTo(b.vMps, 6);
+      }
+    }
+  });
+});

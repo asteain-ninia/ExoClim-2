@@ -103,8 +103,9 @@ test.describe('P4-5b: パラメータ調整 UI（OrbitalParams + PlanetBodyParam
     const before = await canvasFingerprint(page);
     // 23.5° → 60° に変えると δ(m=6) ≈ +22.65° から +58° に拡大、ITCZ が大きく北上する
     await setRangeValue(page, 'slider-body-axial-tilt', '60');
-    // Step 1+2 pipeline + React 再描画完了まで余裕を持って待つ
-    await page.waitForTimeout(500);
+    // Step 1+2 pipeline + React 再描画完了まで余裕を持って待つ。
+    // P4-8 で Step 4 が重くなったため待機を延長。
+    await page.waitForTimeout(900);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });

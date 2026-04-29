@@ -79,7 +79,9 @@ test.describe('P4-6: Step 2 風帯', () => {
   test('卓越風 代表速さスライダーを変えると Canvas 描画が変わる', async ({ page }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-wind-mean-speed', '15');
-    await page.waitForTimeout(200);
+    // P4-8 で Step 4 の追加処理（pressureCenter 検出 12 ヶ月分・mountain deflection・
+    // monsoon reversal）により pipeline が重くなったため、十分な待機時間を確保する。
+    await page.waitForTimeout(700);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });

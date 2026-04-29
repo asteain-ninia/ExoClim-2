@@ -102,6 +102,18 @@ export function Legend() {
             圧力 anomaly（Step 4、高赤 / 低青）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.pressureCenters}
+              onChange={(e) => setLegendVisibility({ pressureCenters: e.target.checked })}
+              data-testid="legend-pressure-centers"
+            />
+            <span className="legend-swatch legend-swatch--pressure-center" aria-hidden="true" />
+            気圧中心（Step 4、H / L マーカー）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

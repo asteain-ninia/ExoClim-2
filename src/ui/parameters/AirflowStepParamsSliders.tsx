@@ -35,6 +35,30 @@ export function AirflowStepParamsSliders() {
         defaultValue={DEFAULT_AIRFLOW_STEP_PARAMS.mountainDeflectionThresholdMeters}
         onChange={(v) => setAirflowParams({ mountainDeflectionThresholdMeters: v })}
       />
+      <Slider
+        id="airflow-monsoon-reversal"
+        label="モンスーン反転 強度"
+        unit="×"
+        min={0}
+        max={1}
+        step={0.05}
+        precision={2}
+        value={airflowParams.monsoonReversalStrength}
+        defaultValue={DEFAULT_AIRFLOW_STEP_PARAMS.monsoonReversalStrength}
+        onChange={(v) => setAirflowParams({ monsoonReversalStrength: v })}
+      />
+      <Slider
+        id="airflow-pressure-center-threshold"
+        label="気圧中心 検出しきい値"
+        unit="hPa"
+        min={0.5}
+        max={10}
+        step={0.5}
+        precision={1}
+        value={airflowParams.pressureCenterThresholdHpa}
+        defaultValue={DEFAULT_AIRFLOW_STEP_PARAMS.pressureCenterThresholdHpa}
+        onChange={(v) => setAirflowParams({ pressureCenterThresholdHpa: v })}
+      />
     </fieldset>
   );
 }
