@@ -171,6 +171,36 @@ body {
   border-color: #d8e6f4;
 }
 
+.legend-swatch--final-wind {
+  background: transparent;
+  border-color: #f0d870;
+  position: relative;
+}
+
+.legend-swatch--final-wind::before {
+  content: '⇒';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f0d870;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.legend-swatch--pressure-high {
+  background: rgba(220, 80, 80, 0.40);
+  border-color: #dc5050;
+  width: 12px;
+}
+
+.legend-swatch--pressure-low {
+  background: rgba(60, 110, 200, 0.40);
+  border-color: #3c6ec8;
+  width: 12px;
+}
+
 .legend-swatch--wind::before {
   content: '→';
   position: absolute;

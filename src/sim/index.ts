@@ -14,3 +14,6 @@ export {
   classificationFromCorrection,
   computeOceanCurrent,
 } from './03_ocean_current';
+
+export type { AirflowStepParams } from './04_airflow';
+export { DEFAULT_AIRFLOW_STEP_PARAMS, computeAirflow } from './04_airflow';

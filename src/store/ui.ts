@@ -22,7 +22,7 @@ export type SeasonPhaseView = 'annual' | number;
 
 /**
  * 凡例・補助線の表示／非表示フラグ集合（[要件定義書.md §2.3.2]）。
- * Step 1 ITCZ + Step 2 風帯 + Step 3 海流。Step 4〜7 連結時に項目を追加する。
+ * Step 1〜4 連結。Step 5〜7 連結時に項目を追加する。
  */
 export interface LegendVisibility {
   readonly itczCenterLine: boolean;
@@ -33,6 +33,10 @@ export interface LegendVisibility {
   readonly oceanCurrents: boolean;
   /** Step 3 海流の海氷マスクの表示トグル。 */
   readonly seaIce: boolean;
+  /** Step 4 気流の最終地表風ベクトル overlay の表示トグル（ON にすると Step 2 矢印を置換）。 */
+  readonly finalWindVectors: boolean;
+  /** Step 4 気流の圧力 anomaly ヒートマップ表示トグル。 */
+  readonly pressureAnomaly: boolean;
 }
 
 export interface UIState {
@@ -57,9 +61,11 @@ const INITIAL_UI_STATE: UIState = {
   legendVisibility: {
     itczCenterLine: true,
     itczInfluenceBand: true,
-    windVectors: true,
+    windVectors: false,    // Step 2 卓越風（既定 OFF: Step 4 final wind を既定で表示）
     oceanCurrents: true,
     seaIce: true,
+    finalWindVectors: true,  // Step 4 final wind（既定 ON）
+    pressureAnomaly: false,  // 圧力 anomaly ヒートマップ（既定 OFF、利用者が必要時に ON）
   },
 };
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
 import {
+  DEFAULT_AIRFLOW_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
@@ -17,6 +18,7 @@ const baseInputs = (): PipelineInputs => ({
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
   windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
   oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
 });
 
 describe('worker/bridge: createDirectPipelineBridge', () => {

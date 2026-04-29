@@ -56,17 +56,24 @@ test.describe('P4-6: Step 2 風帯', () => {
     await expect(page.getByTestId('slider-wind-mean-speed')).toBeVisible();
   });
 
-  test('凡例に「卓越風」トグルが表示され、既定で ON', async ({ page }) => {
+  test('凡例に「卓越風」トグルが表示される（既定 OFF: P4-8 で Step 4 final wind を既定 ON に）', async ({ page }) => {
     await expect(page.getByTestId('legend-wind-vectors')).toBeVisible();
-    await expect(page.getByTestId('legend-wind-vectors')).toBeChecked();
+    await expect(page.getByTestId('legend-wind-vectors')).not.toBeChecked();
   });
 
-  test('卓越風トグルを OFF にすると Canvas 描画が変わる（風矢印が消える）', async ({ page }) => {
-    const beforeOff = await canvasFingerprint(page);
+  test('卓越風トグルを ON / OFF すると Canvas 描画が変わる', async ({ page }) => {
+    // Step 4 final wind が同じ位置に描画されるため、Step 2 の効果を観察するには Step 4 を一旦 OFF にする。
+    await page.getByTestId('legend-final-wind').uncheck();
+    await page.waitForTimeout(150);
+    const beforeStep2On = await canvasFingerprint(page);
+    await page.getByTestId('legend-wind-vectors').check();
+    await page.waitForTimeout(150);
+    const afterStep2On = await canvasFingerprint(page);
+    expect(afterStep2On).not.toBe(beforeStep2On);
     await page.getByTestId('legend-wind-vectors').uncheck();
-    await page.waitForTimeout(100);
-    const afterOff = await canvasFingerprint(page);
-    expect(afterOff).not.toBe(beforeOff);
+    await page.waitForTimeout(150);
+    const afterStep2Off = await canvasFingerprint(page);
+    expect(afterStep2Off).not.toBe(afterStep2On);
   });
 
   test('卓越風 代表速さスライダーを変えると Canvas 描画が変わる', async ({ page }) => {

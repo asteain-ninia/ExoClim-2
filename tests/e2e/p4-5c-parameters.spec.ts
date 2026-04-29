@@ -98,10 +98,11 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
 
   test('TerrainSource: 手続き生成で seed を変えると Canvas 描画が変わる', async ({ page }) => {
     await page.getByTestId('terrain-kind-procedural').click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(800);
     const beforeSeed = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-terrain-seed', '100');
-    await page.waitForTimeout(300);
+    // 地形生成 + Step 1〜4 全て再計算なので待機を長めに
+    await page.waitForTimeout(1500);
     const afterSeed = await canvasFingerprint(page);
     expect(afterSeed).not.toBe(beforeSeed);
   });
@@ -122,7 +123,7 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
     const before = await canvasFingerprint(page);
     // 既定 15° → 5° に縮める。中心線は変わらず帯のみ細くなる
     await setRangeValue(page, 'slider-itcz-half-width', '5');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(500);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });
@@ -132,7 +133,7 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
   }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-itcz-monsoon-pull', '0');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(500);
     const after = await canvasFingerprint(page);
     // 地球地形では landFraction の差で年平均線が陸海バランスに引き寄せられている。
     // 0 にすると一様に赤道の直線に戻るので描画が変わる。

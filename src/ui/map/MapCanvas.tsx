@@ -13,6 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type {
+  AirflowResult,
   Cell,
   Grid,
   GridMap,
@@ -351,6 +352,73 @@ function buildOceanCurrentBitmap(
   return off;
 }
 
+/**
+ * 圧力 anomaly ヒートマップをオフスクリーン Canvas に構築する。
+ *
+ * 正値（高気圧）→ 赤、負値（低気圧）→ 青。値の絶対値で alpha スケール。
+ * 参照月は currentSeason に従う（年平均なら 12 ヶ月平均）。
+ */
+function buildPressureAnomalyBitmap(
+  airflow: AirflowResult,
+  monthIndex: number | null,
+  grid: Grid,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  // monthIndex = null なら 12 ヶ月平均
+  const monthsArr = airflow.monthlyPressureAnomalyHpa;
+  const getValue = (i: number, j: number): number => {
+    if (monthIndex !== null) {
+      return monthsArr[monthIndex]?.[i]?.[j] ?? 0;
+    }
+    let sum = 0;
+    let count = 0;
+    for (const month of monthsArr) {
+      const v = month[i]?.[j];
+      if (v !== undefined) {
+        sum += v;
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : 0;
+  };
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+  const SCALE_HPA = 12;
+
+  for (let r = 0; r < rows; r++) {
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const value = getValue(r, c);
+      if (value === 0) continue;
+      const intensity = Math.min(1, Math.abs(value) / SCALE_HPA);
+      const alpha = Math.round(intensity * 0.45 * 255);
+      const offset = (imageY * cols + c) * 4;
+      if (value > 0) {
+        data[offset] = 220;
+        data[offset + 1] = 80;
+        data[offset + 2] = 80;
+        data[offset + 3] = alpha;
+      } else {
+        data[offset] = 60;
+        data[offset + 1] = 110;
+        data[offset + 2] = 200;
+        data[offset + 3] = alpha;
+      }
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
 /** 海氷マスクをオフスクリーン Canvas に構築する。 */
 function buildSeaIceBitmap(
   oceanCurrent: OceanCurrentResult,
@@ -398,6 +466,60 @@ function drawOverlayBitmap(
     ctx.drawImage(bitmap, drawOffset, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
   }
   ctx.imageSmoothingEnabled = previousSmoothing;
+}
+
+/** 最終地表風（Step 4）を Step 2 と同じ格子点に色違い（黄系）の矢印で描く。 */
+function drawFinalWindVectors(
+  ctx: CanvasRenderingContext2D,
+  windField: GridMap<WindVector>,
+  grid: Grid,
+  normPanPx: number,
+): void {
+  const sampleLatStepDeg = 15;
+  const sampleLonStepDeg = 30;
+  const speedToPx = 14 / 5;
+  const arrowHeadPx = 4;
+
+  ctx.strokeStyle = '#f0d870';
+  ctx.fillStyle = '#f0d870';
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+
+  for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+    for (let lat = -75; lat <= 75; lat += sampleLatStepDeg) {
+      const i = Math.round((lat + 90) / grid.resolutionDeg - 0.5);
+      const row = windField[i];
+      if (!row) continue;
+      for (let lon = -180 + sampleLonStepDeg / 2; lon < 180; lon += sampleLonStepDeg) {
+        const j = Math.round((lon + 180) / grid.resolutionDeg - 0.5);
+        const wind = row[j];
+        if (!wind) continue;
+        const { x: x0, y: y0 } = projectRaw(lat, lon, VIEWPORT, drawOffset);
+        if (x0 < -50 || x0 > CANVAS_WIDTH_PX + 50) continue;
+        const dx = wind.uMps * speedToPx;
+        const dy = -wind.vMps * speedToPx;
+        const x1 = x0 + dx;
+        const y1 = y0 + dy;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        const length = Math.sqrt(dx * dx + dy * dy);
+        if (length > 1) {
+          const headDx = (dx / length) * arrowHeadPx;
+          const headDy = (dy / length) * arrowHeadPx;
+          const perpDx = -headDy * 0.6;
+          const perpDy = headDx * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x1 - headDx + perpDx, y1 - headDy + perpDy);
+          ctx.lineTo(x1 - headDx - perpDx, y1 - headDy - perpDy);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -499,9 +621,11 @@ function drawMap(
   terrainBitmap: HTMLCanvasElement | null,
   oceanCurrentBitmap: HTMLCanvasElement | null,
   seaIceBitmap: HTMLCanvasElement | null,
+  pressureAnomalyBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
+  finalWindField: GridMap<WindVector> | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -519,6 +643,10 @@ function drawMap(
   if (legendVisibility.oceanCurrents && oceanCurrentBitmap) {
     drawOverlayBitmap(ctx, oceanCurrentBitmap, norm);
   }
+  // 圧力 anomaly ヒートマップ（陸海の上）
+  if (legendVisibility.pressureAnomaly && pressureAnomalyBitmap) {
+    drawOverlayBitmap(ctx, pressureAnomalyBitmap, norm);
+  }
   // 海氷は最後に陸海の上にかぶせる（白で覆う）。
   if (legendVisibility.seaIce && seaIceBitmap) {
     drawOverlayBitmap(ctx, seaIceBitmap, norm);
@@ -535,6 +663,9 @@ function drawMap(
   if (legendVisibility.windVectors && windField && grid) {
     drawWindVectors(ctx, windField, grid, norm);
   }
+  if (legendVisibility.finalWindVectors && finalWindField && grid) {
+    drawFinalWindVectors(ctx, finalWindField, grid, norm);
+  }
 }
 
 /**
@@ -549,6 +680,7 @@ export function MapCanvas() {
   const itcz = useResultsStore((s) => s.itcz);
   const windBelt = useResultsStore((s) => s.windBelt);
   const oceanCurrent = useResultsStore((s) => s.oceanCurrent);
+  const airflow = useResultsStore((s) => s.airflow);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
@@ -571,6 +703,44 @@ export function MapCanvas() {
     () => (oceanCurrent && grid ? buildSeaIceBitmap(oceanCurrent, grid) : null),
     [oceanCurrent, grid],
   );
+
+  // 圧力 anomaly ビットマップ（airflow + currentSeason 依存）
+  const pressureAnomalyBitmap = useMemo(() => {
+    if (!airflow || !grid) return null;
+    const monthIndex = currentSeason === 'annual' ? null : currentSeason;
+    return buildPressureAnomalyBitmap(airflow, monthIndex, grid);
+  }, [airflow, currentSeason, grid]);
+
+  // Step 4 の最終地表風（年平均は 12 ヶ月平均、月別はその月）
+  const finalWindField = useMemo<GridMap<WindVector> | null>(() => {
+    if (!airflow) return null;
+    if (currentSeason === 'annual') {
+      const months = airflow.monthlyWindField;
+      const firstMonth = months[0];
+      if (!firstMonth) return null;
+      const rows = firstMonth.length;
+      const cols = firstMonth[0]?.length ?? 0;
+      const averaged: WindVector[][] = new Array(rows);
+      for (let i = 0; i < rows; i++) {
+        const row: WindVector[] = new Array(cols);
+        for (let j = 0; j < cols; j++) {
+          let sumU = 0;
+          let sumV = 0;
+          for (const monthField of months) {
+            const cell = monthField[i]?.[j];
+            if (cell) {
+              sumU += cell.uMps;
+              sumV += cell.vMps;
+            }
+          }
+          row[j] = { uMps: sumU / months.length, vMps: sumV / months.length };
+        }
+        averaged[i] = row;
+      }
+      return averaged;
+    }
+    return airflow.monthlyWindField[currentSeason] ?? null;
+  }, [airflow, currentSeason]);
 
   // ITCZ + season + halfwidth から bands を導出し、ビットマップとセンターラインの両方で再利用する
   const bands = useMemo(
@@ -647,9 +817,11 @@ export function MapCanvas() {
       terrainBitmap,
       oceanCurrentBitmap,
       seaIceBitmap,
+      pressureAnomalyBitmap,
       influenceBandBitmap,
       bands,
       windField,
+      finalWindField,
       grid,
       legendVisibility,
     );
@@ -658,9 +830,11 @@ export function MapCanvas() {
     terrainBitmap,
     oceanCurrentBitmap,
     seaIceBitmap,
+    pressureAnomalyBitmap,
     influenceBandBitmap,
     bands,
     windField,
+    finalWindField,
     grid,
     legendVisibility,
   ]);

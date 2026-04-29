@@ -10,6 +10,7 @@ export {
 } from './map';
 
 export {
+  AirflowStepParamsSliders,
   AtmosphereOceanSliders,
   ITCZStepParamsSliders,
   OceanCurrentStepParamsSliders,

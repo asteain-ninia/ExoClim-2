@@ -90,6 +90,7 @@ export function connectStoresToBridge(
           itczParams: params.itczParams,
           windBeltParams: params.windBeltParams,
           oceanCurrentParams: params.oceanCurrentParams,
+          airflowParams: params.airflowParams,
         };
         const output = await bridge.run(inputs);
         resultsStore.getState().setOutput(output);

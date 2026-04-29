@@ -77,6 +77,31 @@ export function Legend() {
             海氷（Step 3、|lat|＞しきい値）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.finalWindVectors}
+              onChange={(e) => setLegendVisibility({ finalWindVectors: e.target.checked })}
+              data-testid="legend-final-wind"
+            />
+            <span className="legend-swatch legend-swatch--final-wind" aria-hidden="true" />
+            最終地表風（Step 4、合成済み矢印）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.pressureAnomaly}
+              onChange={(e) => setLegendVisibility({ pressureAnomaly: e.target.checked })}
+              data-testid="legend-pressure-anomaly"
+            />
+            <span className="legend-swatch legend-swatch--pressure-high" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--pressure-low" aria-hidden="true" />
+            圧力 anomaly（Step 4、高赤 / 低青）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

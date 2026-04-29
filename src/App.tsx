@@ -9,6 +9,7 @@ import {
   useResultsStore,
 } from '@/store';
 import {
+  AirflowStepParamsSliders,
   AtmosphereOceanSliders,
   ITCZStepParamsSliders,
   Legend,
@@ -52,6 +53,7 @@ export function App() {
           <ITCZStepParamsSliders />
           <WindBeltStepParamsSliders />
           <OceanCurrentStepParamsSliders />
+          <AirflowStepParamsSliders />
         </section>
       </main>
     </div>
