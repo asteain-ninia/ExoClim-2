@@ -8,3 +8,5 @@ export {
   MapCanvas,
   SeasonSelector,
 } from './map';
+
+export { OrbitalSliders, PlanetBodySliders, Slider } from './parameters';

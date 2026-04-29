@@ -42,9 +42,15 @@ body {
 
 .app__main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 20px;
   align-items: start;
+}
+
+.app__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .map-section {
@@ -131,4 +137,124 @@ body {
   color: #8aa0b8;
   font-size: 0.8rem;
   line-height: 1.4;
+}
+
+/* === Parameter sliders === */
+
+.param-group {
+  background: #14202c;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  padding: 10px 14px 12px;
+  margin: 0;
+}
+
+.param-group legend {
+  padding: 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #d8e6f4;
+}
+
+.slider {
+  margin-top: 8px;
+}
+
+.slider:first-of-type {
+  margin-top: 4px;
+}
+
+.slider__label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: #d8e6f4;
+  margin-bottom: 2px;
+  cursor: default;
+}
+
+.slider__label {
+  flex: 0 0 auto;
+}
+
+.slider__value {
+  font-variant-numeric: tabular-nums;
+  color: #aac8e0;
+  font-size: 0.85rem;
+}
+
+.slider__unit {
+  margin-left: 2px;
+  color: #6f8aa0;
+  font-size: 0.78rem;
+}
+
+.slider__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider__input {
+  flex: 1;
+  min-width: 0;
+  accent-color: #4a7a98;
+  cursor: pointer;
+}
+
+.slider__reset {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: #1a2c3d;
+  color: #aac8e0;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.slider__reset:hover {
+  background: #2a4055;
+  color: #d8e6f4;
+}
+
+.param-toggle {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.param-toggle__label {
+  font-size: 0.85rem;
+  color: #d8e6f4;
+}
+
+.param-toggle__buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.param-toggle__btn {
+  flex: 1;
+  padding: 5px 10px;
+  background: #1a2c3d;
+  color: #d8e6f4;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.param-toggle__btn:hover {
+  background: #1c2c3d;
+}
+
+.param-toggle__btn--active {
+  background: #2a4055;
+  border-color: #4a6075;
 }

@@ -8,7 +8,7 @@ import {
   useParamsStore,
   useResultsStore,
 } from '@/store';
-import { Legend, MapCanvas, SeasonSelector } from '@/ui';
+import { Legend, MapCanvas, OrbitalSliders, PlanetBodySliders, SeasonSelector } from '@/ui';
 import { createWorkerPipelineBridge } from '@/worker';
 
 export function App() {
@@ -32,8 +32,10 @@ export function App() {
           <MapCanvas />
           <SeasonSelector />
         </section>
-        <aside>
+        <aside className="app__aside">
           <Legend />
+          <OrbitalSliders />
+          <PlanetBodySliders />
         </aside>
       </main>
     </div>
