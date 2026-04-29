@@ -1,6 +1,10 @@
 // 凡例コンポーネント。常時表示。
 // 仕様: [要件定義書.md §2.3.2] 凡例・補助線（個別表示／非表示の切替）。
-// 規約: ui store の legendVisibility のみを購読・更新する。
+// 規約:
+//   - ui store の legendVisibility のみを購読・更新する。
+//   - パラメータ調整 UI と視覚一貫性を保つため、fieldset / legend のパターン
+//     （`.param-group` クラス）で枠と表題を組む。fieldset role は ARIA `group` で、
+//     legend が group の accessible name として機能する。
 
 import { useUIStore } from '@/store/ui';
 
@@ -9,9 +13,9 @@ export function Legend() {
   const setLegendVisibility = useUIStore((s) => s.setLegendVisibility);
 
   return (
-    <div className="legend" role="region" aria-label="凡例">
-      <h3>凡例</h3>
-      <ul>
+    <fieldset className="param-group legend-panel" data-testid="legend-panel">
+      <legend>凡例</legend>
+      <ul className="legend-panel__list">
         <li>
           <label>
             <input
@@ -37,9 +41,9 @@ export function Legend() {
           </label>
         </li>
       </ul>
-      <p className="legend-note">
+      <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。
       </p>
-    </div>
+    </fieldset>
   );
 }

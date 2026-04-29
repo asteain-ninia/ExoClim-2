@@ -45,7 +45,8 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
   });
 
   test('凡例が常時表示される（[要件定義書.md §2.3.2]）', async ({ page }) => {
-    await expect(page.getByRole('region', { name: '凡例' })).toBeVisible();
+    // fieldset / legend パターンに統一したため role は 'group'（legend が accessible name）
+    await expect(page.getByRole('group', { name: '凡例' })).toBeVisible();
     await expect(page.getByTestId('legend-itcz-center')).toBeChecked();
     await expect(page.getByTestId('legend-itcz-band')).toBeChecked();
   });

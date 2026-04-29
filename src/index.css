@@ -50,7 +50,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .controls-section {
@@ -103,34 +103,31 @@ body {
   border-color: #4a6075;
 }
 
-.legend {
-  background: #14202c;
-  padding: 12px 14px;
-  border: 1px solid #2a4055;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
+/* 凡例パネル（.param-group を継承し、リスト構造のみ追加） */
 
-.legend h3 {
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-.legend ul {
+.legend-panel__list {
   list-style: none;
   margin: 0;
   padding: 0;
+  font-size: 0.9rem;
 }
 
-.legend li {
+.legend-panel__list li {
   margin-bottom: 6px;
 }
 
-.legend label {
+.legend-panel__list label {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+
+.legend-panel__note {
+  margin: 10px 0 0;
+  color: #8aa0b8;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .legend-swatch {
@@ -151,16 +148,11 @@ body {
   border-color: #dc5050;
 }
 
-.legend-note {
-  margin: 10px 0 0;
-  color: #8aa0b8;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-/* === Parameter sliders === */
+/* === Parameter / Legend panel (fieldset / legend pattern) === */
 
 .param-group {
+  /* fieldset は子要素の min-content で width が膨らむデフォルト挙動があるため明示的に 0 へ */
+  min-width: 0;
   background: #14202c;
   border: 1px solid #2a4055;
   border-radius: 4px;
