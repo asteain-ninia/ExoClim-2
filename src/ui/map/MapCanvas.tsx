@@ -298,9 +298,12 @@ function drawInfluenceBandBitmap(
  *
  * `monthlyCoastalTemperatureCorrectionCelsius[0]` の符号で warm/cold/neutral を判定し、
  * grid 解像度のピクセルとして塗る。値の絶対値で alpha を調整（影響強度に比例して濃くなる）。
- *   warm: 橙色 #dc823c に絶対値スケール α
- *   cold: 青色 #3c82dc に絶対値スケール α
+ *   warm: 橙色 #dc823c に絶対値スケール α（warmMaxCelsius で正規化）
+ *   cold: 青色 #3c82dc に絶対値スケール α（coldMaxCelsius で正規化）
  *   neutral: 透明
+ *
+ * 暖流と寒流で max が異なるため（既定 +15 / -10）、片方だけで正規化すると寒流が
+ * 最大でも 0.67 までしか濃くならず西岸寒流が見えにくくなる。両者を別々に正規化する。
  *
  * 季節依存なしのため、`monthlyCoastalTemperatureCorrectionCelsius[0]`（1 月）を代表値として使う。
  * 将来 Step 5 気温フィードバックで月別差分が出たら currentSeason 依存に拡張する。
@@ -309,6 +312,7 @@ function buildOceanCurrentBitmap(
   oceanCurrent: OceanCurrentResult,
   grid: Grid,
   warmMaxCelsius: number,
+  coldMaxCelsius: number,
 ): HTMLCanvasElement {
   const cols = grid.longitudeCount;
   const rows = grid.latitudeCount;
@@ -330,7 +334,8 @@ function buildOceanCurrentBitmap(
       const correction = correctionRow[c];
       if (correction === undefined || correction === 0) continue;
       const offset = (imageY * cols + c) * 4;
-      const intensity = Math.min(1, Math.abs(correction) / Math.max(1, warmMaxCelsius));
+      const max = correction > 0 ? warmMaxCelsius : coldMaxCelsius;
+      const intensity = Math.min(1, Math.abs(correction) / Math.max(1, max));
       const alpha = Math.round(intensity * 0.55 * 255);
       if (correction > 0) {
         // warm
@@ -419,11 +424,26 @@ function buildPressureAnomalyBitmap(
   return off;
 }
 
-/** 海氷マスクをオフスクリーン Canvas に構築する。 */
-function buildSeaIceBitmap(
-  oceanCurrent: OceanCurrentResult,
-  grid: Grid,
-): HTMLCanvasElement {
+/** 海氷の表示用フェード幅（°）。しきい値の前後 SEA_ICE_FADE_WIDTH_DEG で α を線形補間する。 */
+const SEA_ICE_FADE_WIDTH_DEG = 5;
+/** 海氷の最大不透明度（α 1 のときの最終 alpha 値、255 中）。 */
+const SEA_ICE_MAX_ALPHA = 217; // ~85%
+
+/**
+ * 海氷オーバーレイをオフスクリーン Canvas に構築する。
+ *
+ * `OceanCurrentResult.monthlySeaIceMask` は二値（しきい値超過なら true）だが、表示は
+ * 「特定緯度でスパーンと切れる」のを避けるため、UI 側でしきい値前後 SEA_ICE_FADE_WIDTH_DEG の
+ * 範囲に α 線形フェードをかける。具体的には:
+ *   |lat| < threshold - fade: α = 0
+ *   threshold - fade ≤ |lat| ≤ threshold + fade: α = 線形補間 [0, 1]
+ *   |lat| > threshold + fade: α = 1
+ * 海洋セル (`!cell.isLand`) のみを対象とする。
+ *
+ * 二値 mask 自体は Step 5 気温（雪氷フィードバック）が消費するため、計算層では維持。
+ * UI 側で表示を滑らかにするのは凡例と同等の責務（[要件定義書.md §2.3.2]）。
+ */
+function buildSeaIceBitmap(grid: Grid, thresholdDeg: number): HTMLCanvasElement {
   const cols = grid.longitudeCount;
   const rows = grid.latitudeCount;
   const off = document.createElement('canvas');
@@ -432,21 +452,27 @@ function buildSeaIceBitmap(
   const offCtx = off.getContext('2d');
   if (!offCtx) return off;
 
-  const seaIceGrid = oceanCurrent.monthlySeaIceMask[0];
   const imgData = offCtx.createImageData(cols, rows);
   const data = imgData.data;
 
+  const fadeStart = thresholdDeg - SEA_ICE_FADE_WIDTH_DEG;
+  const fadeEnd = thresholdDeg + SEA_ICE_FADE_WIDTH_DEG;
+
   for (let r = 0; r < rows; r++) {
-    const row = seaIceGrid[r];
-    if (!row) continue;
+    const cellRow = grid.cells[r];
+    if (!cellRow) continue;
     const imageY = rows - 1 - r;
     for (let c = 0; c < cols; c++) {
-      if (!row[c]) continue;
+      const cell = cellRow[c];
+      if (!cell || cell.isLand) continue;
+      const absLat = Math.abs(cell.latitudeDeg);
+      if (absLat <= fadeStart) continue;
+      const t = absLat >= fadeEnd ? 1 : (absLat - fadeStart) / (fadeEnd - fadeStart);
       const offset = (imageY * cols + c) * 4;
       data[offset] = 230;
       data[offset + 1] = 240;
       data[offset + 2] = 250;
-      data[offset + 3] = 217; // ~85% opacity
+      data[offset + 3] = Math.round(t * SEA_ICE_MAX_ALPHA);
     }
   }
 
@@ -690,18 +716,27 @@ export function MapCanvas() {
   const oceanWarmMaxRise = useParamsStore(
     (s) => s.oceanCurrentParams.warmCurrentMaxRiseCelsius,
   );
+  const oceanColdMaxDrop = useParamsStore(
+    (s) => s.oceanCurrentParams.coldCurrentMaxDropCelsius,
+  );
+  const seaIceThresholdDeg = useParamsStore(
+    (s) => s.oceanCurrentParams.seaIceLatitudeThresholdDeg,
+  );
 
   // grid 変化時にオフスクリーン地形ビットマップを再構築する（地形生成は重いので memoize）
   const terrainBitmap = useMemo(() => (grid ? buildTerrainBitmap(grid) : null), [grid]);
 
   // 海流オーバーレイ・海氷ビットマップ（[oceanCurrent, grid] が変化するたび再構築）
   const oceanCurrentBitmap = useMemo(
-    () => (oceanCurrent && grid ? buildOceanCurrentBitmap(oceanCurrent, grid, oceanWarmMaxRise) : null),
-    [oceanCurrent, grid, oceanWarmMaxRise],
+    () =>
+      oceanCurrent && grid
+        ? buildOceanCurrentBitmap(oceanCurrent, grid, oceanWarmMaxRise, oceanColdMaxDrop)
+        : null,
+    [oceanCurrent, grid, oceanWarmMaxRise, oceanColdMaxDrop],
   );
   const seaIceBitmap = useMemo(
-    () => (oceanCurrent && grid ? buildSeaIceBitmap(oceanCurrent, grid) : null),
-    [oceanCurrent, grid],
+    () => (grid ? buildSeaIceBitmap(grid, seaIceThresholdDeg) : null),
+    [grid, seaIceThresholdDeg],
   );
 
   // 圧力 anomaly ビットマップ（airflow + currentSeason 依存）

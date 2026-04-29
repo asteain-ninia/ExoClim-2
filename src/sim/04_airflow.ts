@@ -37,6 +37,18 @@ const MONTHS_PER_YEAR = 12;
 const DEG_TO_RAD = Math.PI / 180;
 
 /**
+ * 地衡風近似の経験的内部スケール係数。
+ *
+ * 単位を厳密に整合させずに `(hPa/deg) × 1/sin(lat)` を直接 m/s に充てているため、
+ * 単純合算では地形効果が知覚しづらい結果になる（卓越風 5 m/s に対して数 m/s 程度の
+ * 寄与しか出ず、しかも陸海境界の 1 セル幅でしか勾配が立たないので可視点が少ない）。
+ * Pasta は §7.3 で地衡風強度を定量指定していないため、UI で見て地形に応答する強度に
+ * なるよう経験的に内部スケールを掛ける。利用者調整は `pressureGradientCoefficient`
+ * を介して 0–3 倍の範囲で重畳する。
+ */
+const INTERNAL_GEOSTROPHIC_SCALE = 2.5;
+
+/**
  * Step 4 気流の利用者調整パラメータ（[docs/spec/04_気流.md §6.1]）。
  */
 export interface AirflowStepParams {
@@ -104,7 +116,8 @@ function geostrophicComponent(
   // 地衡風（係数は経験スケール、Coriolis sin(lat) で除算する正攻法ではなく単純化）
   // f = 2 * omega * sin(lat) の符号をここに織り込み、coefficient で大きさを調整
   const fSign = sinLat > 0 ? 1 : -1; // NH +1, SH -1
-  const scale = coefficient / Math.max(Math.abs(sinLat), 0.1);
+  const scale =
+    (INTERNAL_GEOSTROPHIC_SCALE * coefficient) / Math.max(Math.abs(sinLat), 0.1);
   const u = -dPdyHpaPerDeg * scale * fSign * rotationSign;
   const v = +dPdxHpaPerDeg * scale * fSign * rotationSign;
   return { uMps: u, vMps: v };
