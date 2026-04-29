@@ -13,8 +13,16 @@ describe('store/params: パラメータ store', () => {
   });
 
   describe('初期状態', () => {
-    it('地球プリセット + デフォルト ITCZ パラメータで初期化される', () => {
-      expect(s().planet).toEqual(EARTH_PLANET_PARAMS);
+    it('地球プリセット（軌道・本体・大気海洋）+ 仮想大陸地形 + デフォルト ITCZ パラメータで初期化される', () => {
+      // 軌道・本体・大気海洋は EARTH プリセットそのまま
+      expect(s().planet.orbital).toEqual(EARTH_PLANET_PARAMS.orbital);
+      expect(s().planet.body).toEqual(EARTH_PLANET_PARAMS.body);
+      expect(s().planet.atmosphereOcean).toEqual(EARTH_PLANET_PARAMS.atmosphereOcean);
+      // 地形は ITCZ デモ用に仮想大陸に上書き
+      expect(s().planet.terrain).toEqual({
+        kind: 'preset',
+        presetId: 'idealized_continent',
+      });
       expect(s().itczParams).toEqual(DEFAULT_ITCZ_STEP_PARAMS);
     });
   });
@@ -66,12 +74,18 @@ describe('store/params: パラメータ store', () => {
   });
 
   describe('reset', () => {
-    it('複数フィールドを変更後 reset で初期状態に戻る', () => {
+    it('複数フィールドを変更後 reset で初期状態（軌道・本体・大気海洋は地球、地形は仮想大陸）に戻る', () => {
       s().setOrbital({ eccentricity: 0.5 });
       s().setBody({ axialTiltDeg: 45 });
       s().setITCZParams({ baseInfluenceHalfWidthDeg: 20 });
       s().reset();
-      expect(s().planet).toEqual(EARTH_PLANET_PARAMS);
+      expect(s().planet.orbital).toEqual(EARTH_PLANET_PARAMS.orbital);
+      expect(s().planet.body).toEqual(EARTH_PLANET_PARAMS.body);
+      expect(s().planet.atmosphereOcean).toEqual(EARTH_PLANET_PARAMS.atmosphereOcean);
+      expect(s().planet.terrain).toEqual({
+        kind: 'preset',
+        presetId: 'idealized_continent',
+      });
       expect(s().itczParams).toEqual(DEFAULT_ITCZ_STEP_PARAMS);
     });
   });

@@ -142,9 +142,14 @@ function generateEarthStatisticConstrainedTerrain(
 }
 
 /**
- * 理想化大陸（赤道横断・経度中央寄せの単一矩形大陸）の地形データ。
- * 旧 ExoClim `generateVirtualContinentMap` の移植。検証用フィクスチャとして
- * [docs/spec/](../../docs/spec/) の単一矩形大陸ケースに使う。
+ * 仮想大陸（経度中央寄せの単一連続陸塊）の地形データ。
+ * 旧 ExoClim `generateVirtualContinentMap` の移植。
+ *
+ * 形状: 各緯度行で `getEarthStatisticsAt(lat).landFraction` セル分の陸地を
+ *   経度中央（c = cols/2）から東西対称に配置する。緯度別陸地割合は地球統計に従い、
+ *   南極や北高緯度では帯が広く、赤道では狭い。**厳密な矩形ではなく**、緯度ごとに
+ *   幅が変化する縦長の連続陸塊になる。検証用フィクスチャとして
+ *   [docs/spec/](../../docs/spec/) の仮想大陸ケースに使う。
  */
 function generateIdealizedContinentTerrain(rows: number, cols: number): TerrainData {
   const total = rows * cols;

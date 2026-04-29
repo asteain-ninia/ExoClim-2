@@ -17,6 +17,19 @@ import {
 } from '@/domain';
 import { DEFAULT_ITCZ_STEP_PARAMS, type ITCZStepParams } from '@/sim/01_itcz';
 
+/**
+ * アプリ初期表示で用いる地形ソース。
+ * 「Earth プリセット」(`EARTH_PLANET_PARAMS.terrain` = `presetId: 'earth'`) は実地球を
+ * 模した手続き生成だが、起動時のデモとしては経度方向の対称性が強い**仮想大陸**の方が
+ * ITCZ の振る舞い（モンスーン引き寄せ・季節移動）が直感的に分かるため、初期表示のみ
+ * 仮想大陸に上書きする。各スライダーの「↺」ボタンや個別の Earth プリセット定数は
+ * そのまま実地球の値を返す（[要件定義書.md §2.5.3] 仮想大陸の検証用フィクスチャ）。
+ */
+const DEFAULT_INITIAL_TERRAIN: TerrainSource = {
+  kind: 'preset',
+  presetId: 'idealized_continent',
+};
+
 export interface ParamsState {
   readonly planet: PlanetParams;
   readonly itczParams: ITCZStepParams;
@@ -40,7 +53,7 @@ export interface ParamsActions {
 export type ParamsStore = ParamsState & ParamsActions;
 
 const INITIAL_PARAMS_STATE: ParamsState = {
-  planet: EARTH_PLANET_PARAMS,
+  planet: { ...EARTH_PLANET_PARAMS, terrain: DEFAULT_INITIAL_TERRAIN },
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
 };
 

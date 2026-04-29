@@ -9,4 +9,11 @@ export {
   SeasonSelector,
 } from './map';
 
-export { OrbitalSliders, PlanetBodySliders, Slider } from './parameters';
+export {
+  AtmosphereOceanSliders,
+  ITCZStepParamsSliders,
+  OrbitalSliders,
+  PlanetBodySliders,
+  Slider,
+  TerrainSourceSelector,
+} from './parameters';

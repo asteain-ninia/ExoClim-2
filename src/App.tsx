@@ -8,7 +8,16 @@ import {
   useParamsStore,
   useResultsStore,
 } from '@/store';
-import { Legend, MapCanvas, OrbitalSliders, PlanetBodySliders, SeasonSelector } from '@/ui';
+import {
+  AtmosphereOceanSliders,
+  ITCZStepParamsSliders,
+  Legend,
+  MapCanvas,
+  OrbitalSliders,
+  PlanetBodySliders,
+  SeasonSelector,
+  TerrainSourceSelector,
+} from '@/ui';
 import { createWorkerPipelineBridge } from '@/worker';
 
 export function App() {
@@ -36,6 +45,9 @@ export function App() {
           <Legend />
           <OrbitalSliders />
           <PlanetBodySliders />
+          <AtmosphereOceanSliders />
+          <TerrainSourceSelector />
+          <ITCZStepParamsSliders />
         </section>
       </main>
     </div>
