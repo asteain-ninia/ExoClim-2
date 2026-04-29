@@ -1,0 +1,134 @@
+/* ExoClim グローバルスタイル（最小限）。 */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+body {
+  background: #0a1722;
+  color: #d8e6f4;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app__header h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.app__header p {
+  margin: 0 0 16px;
+  color: #8aa0b8;
+  font-size: 0.9rem;
+}
+
+.app__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+.map-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.season-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.season-selector__btn {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  background: #14202c;
+  color: #d8e6f4;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.season-selector__btn:hover {
+  background: #1c2c3d;
+}
+
+.season-selector__btn--active {
+  background: #2a4055;
+  border-color: #4a6075;
+}
+
+.legend {
+  background: #14202c;
+  padding: 12px 14px;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.legend h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.legend li {
+  margin-bottom: 6px;
+}
+
+.legend label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border: 1px solid transparent;
+}
+
+.legend-swatch--center {
+  background: #dc5050;
+  height: 2px;
+  border: none;
+}
+
+.legend-swatch--band {
+  background: rgba(220, 80, 80, 0.25);
+  border-color: #dc5050;
+}
+
+.legend-note {
+  margin: 10px 0 0;
+  color: #8aa0b8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
