@@ -32,11 +32,11 @@ export function App() {
           <MapCanvas />
           <SeasonSelector />
         </section>
-        <aside className="app__aside">
+        <section className="controls-section">
           <Legend />
           <OrbitalSliders />
           <PlanetBodySliders />
-        </aside>
+        </section>
       </main>
     </div>
   );

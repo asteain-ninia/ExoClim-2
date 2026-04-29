@@ -65,17 +65,36 @@ export function connectStoresToBridge(
     return grid;
   };
 
+  // Single-in-flight + replay-latest パターン:
+  //   - パイプラインが実行中なら新しい呼び出しは pendingDirty フラグを立てるだけ。
+  //   - 実行完了時にフラグが立っていれば、最新の params で再実行する（do-while ループ）。
+  //   - スライダーを高速ドラッグしても backlog が積まれず、最後の入力に追従する。
+  let isRunning = false;
+  let pendingDirty = false;
+
   const runPipelineFromCurrentParams = async (): Promise<void> => {
-    const params = paramsStore.getState();
-    const grid = resolveGrid(params.planet.terrain);
-    resultsStore.getState().setGrid(grid);
-    const inputs: PipelineInputs = {
-      planet: params.planet,
-      grid,
-      itczParams: params.itczParams,
-    };
-    const output = await bridge.run(inputs);
-    resultsStore.getState().setOutput(output);
+    if (isRunning) {
+      pendingDirty = true;
+      return;
+    }
+    isRunning = true;
+    try {
+      do {
+        pendingDirty = false;
+        const params = paramsStore.getState();
+        const grid = resolveGrid(params.planet.terrain);
+        resultsStore.getState().setGrid(grid);
+        const inputs: PipelineInputs = {
+          planet: params.planet,
+          grid,
+          itczParams: params.itczParams,
+        };
+        const output = await bridge.run(inputs);
+        resultsStore.getState().setOutput(output);
+      } while (pendingDirty);
+    } finally {
+      isRunning = false;
+    }
   };
 
   // 初回実行（現在の params で results を埋める）

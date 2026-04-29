@@ -41,16 +41,35 @@ body {
 }
 
 .app__main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
+}
+
+.map-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.controls-section {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
-.app__aside {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+@media (max-width: 1100px) {
+  .controls-section {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .controls-section {
+    grid-template-columns: 1fr;
+  }
 }
 
 .map-section {
@@ -168,6 +187,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 8px;
   font-size: 0.85rem;
   color: #d8e6f4;
   margin-bottom: 2px;
@@ -175,10 +195,16 @@ body {
 }
 
 .slider__label {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .slider__value {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: #aac8e0;
   font-size: 0.85rem;

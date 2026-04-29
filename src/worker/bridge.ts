@@ -7,6 +7,8 @@
 //   - Worker ブリッジ (createWorkerPipelineBridge) は dev サーバ上で手動確認
 //     （Vitest は node 環境のため Web Worker のフルセット動作は再現困難）。
 
+import type { Grid, PlanetParams } from '@/domain';
+import type { ITCZStepParams } from '@/sim/01_itcz';
 import {
   EMPTY_PIPELINE_CACHE,
   runPipeline,
@@ -44,17 +46,35 @@ export function createDirectPipelineBridge(): PipelineBridge {
   };
 }
 
-/** Worker への送信メッセージ（id でリクエスト/レスポンスを対応付ける）。 */
-interface WorkerRequest {
-  readonly id: number;
-  readonly inputs: PipelineInputs;
+/**
+ * Worker メッセージプロトコル。
+ *
+ * Grid は 1° 解像度で 64,800 セル × 5 フィールド ≈ 数 MB の重いオブジェクトのため、
+ * 毎回 postMessage で structured clone するとスライダー操作で体感的に鈍くなる。
+ * 本プロトコルでは Grid 参照が変化したときだけ `grid-update` を送り、Worker 側で
+ * キャッシュする。通常の pipeline 実行は `run` メッセージで planet と itczParams
+ * のみを送り、Grid は Worker キャッシュから復元する。
+ */
+interface WorkerGridUpdateRequest {
+  readonly type: 'grid-update';
+  readonly grid: Grid;
 }
 
-/** Worker からの返信メッセージ。 */
+interface WorkerRunRequest {
+  readonly type: 'run';
+  readonly id: number;
+  readonly planet: PlanetParams;
+  readonly itczParams: ITCZStepParams;
+}
+
+export type WorkerInboundMessage = WorkerGridUpdateRequest | WorkerRunRequest;
+
 interface WorkerResponse {
   readonly id: number;
   readonly output: PipelineOutput;
 }
+
+export type WorkerOutboundMessage = WorkerResponse;
 
 /**
  * Web Worker ブリッジ。Vite 6 の `new Worker(new URL(...), { type: 'module' })` 形式で起動する。
@@ -67,9 +87,14 @@ export function createWorkerPipelineBridge(): PipelineBridge {
     type: 'module',
   });
   let nextRequestId = 0;
+  /**
+   * 直近 Worker に送信した Grid 参照。新規 run 時に inputs.grid と参照比較し、
+   * 同一なら再送しない（postMessage の structured clone コストを削減）。
+   */
+  let lastSentGrid: Grid | null = null;
   const pendingRequests = new Map<number, (output: PipelineOutput) => void>();
 
-  worker.addEventListener('message', (e: MessageEvent<WorkerResponse>) => {
+  worker.addEventListener('message', (e: MessageEvent<WorkerOutboundMessage>) => {
     const { id, output } = e.data;
     const resolver = pendingRequests.get(id);
     if (resolver) {
@@ -80,16 +105,30 @@ export function createWorkerPipelineBridge(): PipelineBridge {
 
   return {
     run: (inputs) => {
+      if (inputs.grid !== lastSentGrid) {
+        lastSentGrid = inputs.grid;
+        const gridMessage: WorkerGridUpdateRequest = {
+          type: 'grid-update',
+          grid: inputs.grid,
+        };
+        worker.postMessage(gridMessage);
+      }
       const id = ++nextRequestId;
       return new Promise<PipelineOutput>((resolve) => {
         pendingRequests.set(id, resolve);
-        const message: WorkerRequest = { id, inputs };
-        worker.postMessage(message);
+        const runMessage: WorkerRunRequest = {
+          type: 'run',
+          id,
+          planet: inputs.planet,
+          itczParams: inputs.itczParams,
+        };
+        worker.postMessage(runMessage);
       });
     },
     dispose: () => {
       worker.terminate();
       pendingRequests.clear();
+      lastSentGrid = null;
     },
   };
 }
