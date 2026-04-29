@@ -5,7 +5,7 @@
 // 現状（P4-3 / P4-4）は Step 1 ITCZ のみ連結。Step 2〜7 の結果が増えるたびに本型を拡張する。
 
 import { create } from 'zustand';
-import type { Grid, ITCZResult, WindBeltResult } from '@/domain';
+import type { Grid, ITCZResult, OceanCurrentResult, WindBeltResult } from '@/domain';
 import type { PipelineOutput } from '@/worker/pipeline';
 
 export interface ResultsState {
@@ -13,6 +13,8 @@ export interface ResultsState {
   readonly itcz: ITCZResult | null;
   /** Step 2 風帯の結果。未計算なら null。 */
   readonly windBelt: WindBeltResult | null;
+  /** Step 3 海流の結果。未計算なら null。 */
+  readonly oceanCurrent: OceanCurrentResult | null;
   /**
    * 直近 pipeline 実行で使われた Grid（地形含む）。UI 層が陸地・標高描画で参照する。
    * 未計算なら null。
@@ -22,6 +24,7 @@ export interface ResultsState {
   readonly cacheHits: {
     readonly itcz: boolean;
     readonly windBelt: boolean;
+    readonly oceanCurrent: boolean;
   };
 }
 
@@ -39,8 +42,9 @@ export type ResultsStore = ResultsState & ResultsActions;
 const INITIAL_RESULTS_STATE: ResultsState = {
   itcz: null,
   windBelt: null,
+  oceanCurrent: null,
   grid: null,
-  cacheHits: { itcz: false, windBelt: false },
+  cacheHits: { itcz: false, windBelt: false, oceanCurrent: false },
 };
 
 export const createResultsStore = () =>
@@ -50,9 +54,11 @@ export const createResultsStore = () =>
       set({
         itcz: output.itcz,
         windBelt: output.windBelt,
+        oceanCurrent: output.oceanCurrent,
         cacheHits: {
           itcz: output.cacheHits.itcz,
           windBelt: output.cacheHits.windBelt,
+          oceanCurrent: output.cacheHits.oceanCurrent,
         },
       }),
     setGrid: (grid) => set({ grid }),

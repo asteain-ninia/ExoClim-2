@@ -17,8 +17,10 @@ import {
 } from '@/domain';
 import {
   DEFAULT_ITCZ_STEP_PARAMS,
+  DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
   type ITCZStepParams,
+  type OceanCurrentStepParams,
   type WindBeltStepParams,
 } from '@/sim';
 
@@ -39,6 +41,7 @@ export interface ParamsState {
   readonly planet: PlanetParams;
   readonly itczParams: ITCZStepParams;
   readonly windBeltParams: WindBeltStepParams;
+  readonly oceanCurrentParams: OceanCurrentStepParams;
 }
 
 export interface ParamsActions {
@@ -54,6 +57,8 @@ export interface ParamsActions {
   readonly setITCZParams: (patch: Partial<ITCZStepParams>) => void;
   /** Step 2 風帯パラメータを部分更新する。 */
   readonly setWindBeltParams: (patch: Partial<WindBeltStepParams>) => void;
+  /** Step 3 海流パラメータを部分更新する。 */
+  readonly setOceanCurrentParams: (patch: Partial<OceanCurrentStepParams>) => void;
   /** 初期値（地球プリセット + デフォルト Step パラメータ）に戻す。 */
   readonly reset: () => void;
 }
@@ -64,6 +69,7 @@ const INITIAL_PARAMS_STATE: ParamsState = {
   planet: { ...EARTH_PLANET_PARAMS, terrain: DEFAULT_INITIAL_TERRAIN },
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
   windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
+  oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
 };
 
 /**
@@ -94,6 +100,8 @@ export const createParamsStore = () =>
       set((state) => ({ itczParams: { ...state.itczParams, ...patch } })),
     setWindBeltParams: (patch) =>
       set((state) => ({ windBeltParams: { ...state.windBeltParams, ...patch } })),
+    setOceanCurrentParams: (patch) =>
+      set((state) => ({ oceanCurrentParams: { ...state.oceanCurrentParams, ...patch } })),
     reset: () => set(INITIAL_PARAMS_STATE),
   }));
 

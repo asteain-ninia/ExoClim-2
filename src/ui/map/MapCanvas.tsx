@@ -12,7 +12,14 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { Cell, Grid, GridMap, ITCZResult, WindVector } from '@/domain';
+import type {
+  Cell,
+  Grid,
+  GridMap,
+  ITCZResult,
+  OceanCurrentResult,
+  WindVector,
+} from '@/domain';
 import { useParamsStore } from '@/store/params';
 import { useResultsStore } from '@/store/results';
 import {
@@ -286,6 +293,114 @@ function drawInfluenceBandBitmap(
 }
 
 /**
+ * 海流分類オーバーレイをオフスクリーン Canvas に構築する。
+ *
+ * `monthlyCoastalTemperatureCorrectionCelsius[0]` の符号で warm/cold/neutral を判定し、
+ * grid 解像度のピクセルとして塗る。値の絶対値で alpha を調整（影響強度に比例して濃くなる）。
+ *   warm: 橙色 #dc823c に絶対値スケール α
+ *   cold: 青色 #3c82dc に絶対値スケール α
+ *   neutral: 透明
+ *
+ * 季節依存なしのため、`monthlyCoastalTemperatureCorrectionCelsius[0]`（1 月）を代表値として使う。
+ * 将来 Step 5 気温フィードバックで月別差分が出たら currentSeason 依存に拡張する。
+ */
+function buildOceanCurrentBitmap(
+  oceanCurrent: OceanCurrentResult,
+  grid: Grid,
+  warmMaxCelsius: number,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const correctionGrid = oceanCurrent.monthlyCoastalTemperatureCorrectionCelsius[0];
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const correctionRow = correctionGrid[r];
+    if (!correctionRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const correction = correctionRow[c];
+      if (correction === undefined || correction === 0) continue;
+      const offset = (imageY * cols + c) * 4;
+      const intensity = Math.min(1, Math.abs(correction) / Math.max(1, warmMaxCelsius));
+      const alpha = Math.round(intensity * 0.55 * 255);
+      if (correction > 0) {
+        // warm
+        data[offset] = 220;
+        data[offset + 1] = 130;
+        data[offset + 2] = 60;
+        data[offset + 3] = alpha;
+      } else {
+        // cold
+        data[offset] = 60;
+        data[offset + 1] = 130;
+        data[offset + 2] = 220;
+        data[offset + 3] = alpha;
+      }
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
+/** 海氷マスクをオフスクリーン Canvas に構築する。 */
+function buildSeaIceBitmap(
+  oceanCurrent: OceanCurrentResult,
+  grid: Grid,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const seaIceGrid = oceanCurrent.monthlySeaIceMask[0];
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const row = seaIceGrid[r];
+    if (!row) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      if (!row[c]) continue;
+      const offset = (imageY * cols + c) * 4;
+      data[offset] = 230;
+      data[offset + 1] = 240;
+      data[offset + 2] = 250;
+      data[offset + 3] = 217; // ~85% opacity
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
+/** オーバーレイビットマップを 2 オフセットで主 Canvas に重ね描き、経度循環を実現する。 */
+function drawOverlayBitmap(
+  ctx: CanvasRenderingContext2D,
+  bitmap: HTMLCanvasElement,
+  normPanPx: number,
+): void {
+  const previousSmoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  for (const drawOffset of [normPanPx, normPanPx - CANVAS_WIDTH_PX]) {
+    ctx.drawImage(bitmap, drawOffset, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  }
+  ctx.imageSmoothingEnabled = previousSmoothing;
+}
+
+/**
  * 風ベクトル（卓越風）を等間隔の格子点に短い矢印として描く。
  *
  * - サンプル間隔: 経度 30°・緯度 15°（密集回避と読み取りやすさのバランス）
@@ -382,6 +497,8 @@ function drawMap(
   ctx: CanvasRenderingContext2D,
   panOffsetPx: number,
   terrainBitmap: HTMLCanvasElement | null,
+  oceanCurrentBitmap: HTMLCanvasElement | null,
+  seaIceBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
@@ -396,6 +513,15 @@ function drawMap(
     // 地形未解決時のフォールバック背景（全海洋扱い）
     ctx.fillStyle = '#0e2233';
     ctx.fillRect(0, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  }
+
+  // 海流オーバーレイは地形の上、grid 線の下に描く（海洋セルを暖/寒で着色）。
+  if (legendVisibility.oceanCurrents && oceanCurrentBitmap) {
+    drawOverlayBitmap(ctx, oceanCurrentBitmap, norm);
+  }
+  // 海氷は最後に陸海の上にかぶせる（白で覆う）。
+  if (legendVisibility.seaIce && seaIceBitmap) {
+    drawOverlayBitmap(ctx, seaIceBitmap, norm);
   }
 
   drawGrid(ctx, norm);
@@ -422,15 +548,29 @@ export function MapCanvas() {
 
   const itcz = useResultsStore((s) => s.itcz);
   const windBelt = useResultsStore((s) => s.windBelt);
+  const oceanCurrent = useResultsStore((s) => s.oceanCurrent);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
   const baseInfluenceHalfWidthDeg = useParamsStore(
     (s) => s.itczParams.baseInfluenceHalfWidthDeg,
   );
+  const oceanWarmMaxRise = useParamsStore(
+    (s) => s.oceanCurrentParams.warmCurrentMaxRiseCelsius,
+  );
 
   // grid 変化時にオフスクリーン地形ビットマップを再構築する（地形生成は重いので memoize）
   const terrainBitmap = useMemo(() => (grid ? buildTerrainBitmap(grid) : null), [grid]);
+
+  // 海流オーバーレイ・海氷ビットマップ（[oceanCurrent, grid] が変化するたび再構築）
+  const oceanCurrentBitmap = useMemo(
+    () => (oceanCurrent && grid ? buildOceanCurrentBitmap(oceanCurrent, grid, oceanWarmMaxRise) : null),
+    [oceanCurrent, grid, oceanWarmMaxRise],
+  );
+  const seaIceBitmap = useMemo(
+    () => (oceanCurrent && grid ? buildSeaIceBitmap(oceanCurrent, grid) : null),
+    [oceanCurrent, grid],
+  );
 
   // ITCZ + season + halfwidth から bands を導出し、ビットマップとセンターラインの両方で再利用する
   const bands = useMemo(
@@ -505,13 +645,25 @@ export function MapCanvas() {
       ctx,
       panOffsetPx,
       terrainBitmap,
+      oceanCurrentBitmap,
+      seaIceBitmap,
       influenceBandBitmap,
       bands,
       windField,
       grid,
       legendVisibility,
     );
-  }, [panOffsetPx, terrainBitmap, influenceBandBitmap, bands, windField, grid, legendVisibility]);
+  }, [
+    panOffsetPx,
+    terrainBitmap,
+    oceanCurrentBitmap,
+    seaIceBitmap,
+    influenceBandBitmap,
+    bands,
+    windField,
+    grid,
+    legendVisibility,
+  ]);
 
   return (
     <canvas

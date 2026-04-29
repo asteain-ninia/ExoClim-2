@@ -13,6 +13,7 @@ import {
   ITCZStepParamsSliders,
   Legend,
   MapCanvas,
+  OceanCurrentStepParamsSliders,
   OrbitalSliders,
   PlanetBodySliders,
   SeasonSelector,
@@ -50,6 +51,7 @@ export function App() {
           <TerrainSourceSelector />
           <ITCZStepParamsSliders />
           <WindBeltStepParamsSliders />
+          <OceanCurrentStepParamsSliders />
         </section>
       </main>
     </div>

@@ -154,6 +154,23 @@ body {
   position: relative;
 }
 
+.legend-swatch--ocean-warm {
+  background: rgba(220, 130, 60, 0.45);
+  border-color: #dc823c;
+  width: 12px;
+}
+
+.legend-swatch--ocean-cold {
+  background: rgba(60, 130, 220, 0.45);
+  border-color: #3c82dc;
+  width: 12px;
+}
+
+.legend-swatch--sea-ice {
+  background: rgba(230, 240, 250, 0.85);
+  border-color: #d8e6f4;
+}
+
 .legend-swatch--wind::before {
   content: '→';
   position: absolute;

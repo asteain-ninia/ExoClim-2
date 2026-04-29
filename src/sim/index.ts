@@ -7,3 +7,10 @@ export { DEFAULT_ITCZ_STEP_PARAMS, computeITCZ, solarDeclinationDeg } from './01
 
 export type { WindBeltStepParams } from './02_wind_belt';
 export { DEFAULT_WIND_BELT_STEP_PARAMS, computeWindBelt } from './02_wind_belt';
+
+export type { OceanCurrentStepParams } from './03_ocean_current';
+export {
+  DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  classificationFromCorrection,
+  computeOceanCurrent,
+} from './03_ocean_current';

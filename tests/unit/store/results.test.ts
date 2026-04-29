@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
-import { DEFAULT_ITCZ_STEP_PARAMS, DEFAULT_WIND_BELT_STEP_PARAMS } from '@/sim';
+import {
+  DEFAULT_ITCZ_STEP_PARAMS,
+  DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  DEFAULT_WIND_BELT_STEP_PARAMS,
+} from '@/sim';
 import { createResultsStore } from '@/store/results';
 import { EMPTY_PIPELINE_CACHE, runPipeline } from '@/worker/pipeline';
 
@@ -27,6 +31,7 @@ describe('store/results: 結果 store', () => {
           grid: createGrid(2),
           itczParams: DEFAULT_ITCZ_STEP_PARAMS,
           windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
+          oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );
@@ -41,6 +46,7 @@ describe('store/results: 結果 store', () => {
         grid: createGrid(2),
         itczParams: DEFAULT_ITCZ_STEP_PARAMS,
         windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
+        oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
       };
       const first = runPipeline(inputs, EMPTY_PIPELINE_CACHE);
       const second = runPipeline(inputs, first.cache);
@@ -57,6 +63,7 @@ describe('store/results: 結果 store', () => {
           grid: createGrid(2),
           itczParams: DEFAULT_ITCZ_STEP_PARAMS,
           windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
+          oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );

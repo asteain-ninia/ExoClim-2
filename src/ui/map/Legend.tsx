@@ -52,6 +52,31 @@ export function Legend() {
             卓越風（Step 2、矢印）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.oceanCurrents}
+              onChange={(e) => setLegendVisibility({ oceanCurrents: e.target.checked })}
+              data-testid="legend-ocean-currents"
+            />
+            <span className="legend-swatch legend-swatch--ocean-warm" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--ocean-cold" aria-hidden="true" />
+            海流（Step 3、暖流橙 / 寒流青）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.seaIce}
+              onChange={(e) => setLegendVisibility({ seaIce: e.target.checked })}
+              data-testid="legend-sea-ice"
+            />
+            <span className="legend-swatch legend-swatch--sea-ice" aria-hidden="true" />
+            海氷（Step 3、|lat|＞しきい値）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

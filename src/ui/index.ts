@@ -12,6 +12,7 @@ export {
 export {
   AtmosphereOceanSliders,
   ITCZStepParamsSliders,
+  OceanCurrentStepParamsSliders,
   OrbitalSliders,
   PlanetBodySliders,
   Slider,
