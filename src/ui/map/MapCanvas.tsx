@@ -95,37 +95,32 @@ interface RGB {
 }
 
 /**
- * セルの陸海・標高・緯度から表示色を決める。
- * 陸地は 4 段階（低地・高原・山地・高山）、海洋は深さで 3 段階、極域（|lat| > 75°）は氷化。
+ * 段彩図の表示色（旧 ExoClim `components/visualizer/constants.ts` の配色を踏襲）。
+ *
+ * 陸地（ELEVATION_STOPS / ELEVATION_COLORS の discrete 5 段階）:
+ *   0-200m: #7fb86e / 200-500m: #c7db7a / 500-1000m: #cc9a45 /
+ *   1000-2000m: #995a32 / 2000m+: #663301
+ *
+ * 海洋（OCEAN_DISCRETE_COLORS の 3 段階）:
+ *   ≥ -200m (shelf): #7fcdbb / -4000 〜 -200 (deep): #1d91c0 / < -4000 (abyss): #081d58
+ *
+ * 高緯度の氷雪付加は本配色には含めない（旧プロジェクトと同じ「物理地図」流の色彩）。
+ * 海氷・雪線は Step 3 海流 / Step 5 気温のマスクが入った段階で別レイヤーとして重ねる方針。
  */
 function cellColor(cell: Cell): RGB {
-  const isHighLatitude = Math.abs(cell.latitudeDeg) > 75;
   if (cell.isLand) {
-    let base: RGB;
-    const elevation = cell.elevationMeters;
-    if (elevation < 500) base = { r: 0x4a, g: 0x6b, b: 0x3e };
-    else if (elevation < 1500) base = { r: 0x6b, g: 0x6b, b: 0x4a };
-    else if (elevation < 3000) base = { r: 0x8a, g: 0x7a, b: 0x5a };
-    else base = { r: 0xb0, g: 0xa8, b: 0x90 };
-    if (isHighLatitude) {
-      // 高緯度の陸地は氷雪で覆われる近似（白とのブレンド）
-      return {
-        r: Math.round(base.r * 0.4 + 255 * 0.6),
-        g: Math.round(base.g * 0.4 + 255 * 0.6),
-        b: Math.round(base.b * 0.4 + 255 * 0.6),
-      };
-    }
-    return base;
+    const h = cell.elevationMeters;
+    if (h < 200) return { r: 0x7f, g: 0xb8, b: 0x6e };
+    if (h < 500) return { r: 0xc7, g: 0xdb, b: 0x7a };
+    if (h < 1000) return { r: 0xcc, g: 0x9a, b: 0x45 };
+    if (h < 2000) return { r: 0x99, g: 0x5a, b: 0x32 };
+    return { r: 0x66, g: 0x33, b: 0x01 };
   }
-  // 海洋
-  if (isHighLatitude) {
-    // 極海は薄青（海氷の近似、Step 3 海流の海氷マスクが入れば置換）
-    return { r: 0xa0, g: 0xc0, b: 0xd0 };
-  }
-  const depth = -cell.elevationMeters;
-  if (depth < 200) return { r: 0x1a, g: 0x3c, b: 0x5c };
-  if (depth < 2000) return { r: 0x10, g: 0x2c, b: 0x4a };
-  return { r: 0x08, g: 0x1c, b: 0x32 };
+  // 海洋（負の elevation。h は深さ表現）
+  const h = cell.elevationMeters;
+  if (h >= -200) return { r: 0x7f, g: 0xcd, b: 0xbb };
+  if (h >= -4000) return { r: 0x1d, g: 0x91, b: 0xc0 };
+  return { r: 0x08, g: 0x1d, b: 0x58 };
 }
 
 /**
@@ -221,29 +216,74 @@ function drawGrid(ctx: CanvasRenderingContext2D, normPanPx: number): void {
   }
 }
 
-/** ITCZ 影響帯（north と south の間）を半透明赤で塗る。3 オフセットで循環描画。 */
-function drawInfluenceBand(
+/** 影響帯の塗り色（半透明赤、α=0.25）。 */
+const INFLUENCE_BAND_RGBA: readonly [number, number, number, number] = [220, 80, 80, Math.round(255 * 0.25)];
+
+/**
+ * ITCZ 影響帯をオフスクリーン Canvas に per-pixel で描く。
+ *
+ * polygon 描画方式（north 行 → south 行 → close）は山岳切取で南北境界が反転・縮退した
+ * longitude で polygon が pinch（自己交差）し、non-zero winding rule で穴が空く事象が起きた。
+ * 本実装はそれを回避するため canvas X ごとに独立した縦ストリップで塗る。
+ *
+ * 描画範囲は `[0, CANVAS_WIDTH_PX) × [0, CANVAS_HEIGHT_PX)`（pan なし）。
+ * 主 Canvas には複数オフセットで {@link drawImage} することで経度循環を実現する。
+ */
+function buildInfluenceBandBitmap(bands: readonly BandPoint[]): HTMLCanvasElement {
+  const off = document.createElement('canvas');
+  off.width = CANVAS_WIDTH_PX;
+  off.height = CANVAS_HEIGHT_PX;
+  const offCtx = off.getContext('2d');
+  if (!offCtx || bands.length === 0) return off;
+
+  const imgData = offCtx.createImageData(CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  const data = imgData.data;
+  const [bandR, bandG, bandB, bandA] = INFLUENCE_BAND_RGBA;
+
+  for (let x = 0; x < CANVAS_WIDTH_PX; x++) {
+    // 経度（pan なしの基準フレーム、[-180, +180)）
+    const lonDeg = (x / CANVAS_WIDTH_PX) * 360 - 180;
+    // bands は経度方向に等間隔に並ぶ前提（{@link computeBandPoints} で生成）
+    let bandIdx = Math.floor(((lonDeg + 180) / 360) * bands.length);
+    if (bandIdx < 0) bandIdx = 0;
+    if (bandIdx >= bands.length) bandIdx = bands.length - 1;
+    const band = bands[bandIdx];
+    if (!band) continue;
+
+    // 縮退（南北逆転または同一）の longitude では帯を描かない
+    if (band.northLatDeg <= band.southLatDeg) continue;
+
+    // 緯度 → canvas Y（北が小さい Y、南が大きい Y）
+    const yNorth = CANVAS_HEIGHT_PX * (1 - (band.northLatDeg + 90) / 180);
+    const ySouth = CANVAS_HEIGHT_PX * (1 - (band.southLatDeg + 90) / 180);
+    const yStart = Math.max(0, Math.floor(Math.min(yNorth, ySouth)));
+    const yEnd = Math.min(CANVAS_HEIGHT_PX - 1, Math.ceil(Math.max(yNorth, ySouth)));
+
+    for (let y = yStart; y <= yEnd; y++) {
+      const offset = (y * CANVAS_WIDTH_PX + x) * 4;
+      data[offset] = bandR;
+      data[offset + 1] = bandG;
+      data[offset + 2] = bandB;
+      data[offset + 3] = bandA;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
+/** 影響帯ビットマップを 2 オフセットで主 Canvas に重ね描きし、経度循環を実現する。 */
+function drawInfluenceBandBitmap(
   ctx: CanvasRenderingContext2D,
-  bands: readonly BandPoint[],
+  bitmap: HTMLCanvasElement,
   normPanPx: number,
 ): void {
-  ctx.fillStyle = 'rgba(220, 80, 80, 0.25)';
-  for (const drawOffset of [normPanPx, normPanPx - CANVAS_WIDTH_PX, normPanPx + CANVAS_WIDTH_PX]) {
-    ctx.beginPath();
-    for (let i = 0; i < bands.length; i++) {
-      const b = bands[i]!;
-      const { x, y } = projectRaw(b.northLatDeg, b.longitudeDeg, VIEWPORT, drawOffset);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    for (let i = bands.length - 1; i >= 0; i--) {
-      const b = bands[i]!;
-      const { x, y } = projectRaw(b.southLatDeg, b.longitudeDeg, VIEWPORT, drawOffset);
-      ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fill();
+  const previousSmoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  for (const drawOffset of [normPanPx, normPanPx - CANVAS_WIDTH_PX]) {
+    ctx.drawImage(bitmap, drawOffset, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
   }
+  ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
 /** ITCZ 中心線をストロークする。3 オフセットで循環描画し、隣接インスタンス間も連結する。 */
@@ -270,8 +310,8 @@ function drawMap(
   ctx: CanvasRenderingContext2D,
   panOffsetPx: number,
   terrainBitmap: HTMLCanvasElement | null,
-  itcz: ITCZResult | null,
-  currentSeason: SeasonPhaseView,
+  influenceBandBitmap: HTMLCanvasElement | null,
+  centerLineBands: readonly BandPoint[] | null,
   legendVisibility: LegendVisibility,
 ): void {
   const norm = normalizePanOffsetPx(panOffsetPx, VIEWPORT);
@@ -286,15 +326,11 @@ function drawMap(
 
   drawGrid(ctx, norm);
 
-  if (!itcz) return;
-  const bands = computeBandPoints(itcz, currentSeason);
-  if (bands.length === 0) return;
-
-  if (legendVisibility.itczInfluenceBand) {
-    drawInfluenceBand(ctx, bands, norm);
+  if (legendVisibility.itczInfluenceBand && influenceBandBitmap) {
+    drawInfluenceBandBitmap(ctx, influenceBandBitmap, norm);
   }
-  if (legendVisibility.itczCenterLine) {
-    drawCenterLine(ctx, bands, norm);
+  if (legendVisibility.itczCenterLine && centerLineBands && centerLineBands.length > 0) {
+    drawCenterLine(ctx, centerLineBands, norm);
   }
 }
 
@@ -314,6 +350,16 @@ export function MapCanvas() {
 
   // grid 変化時にオフスクリーン地形ビットマップを再構築する（地形生成は重いので memoize）
   const terrainBitmap = useMemo(() => (grid ? buildTerrainBitmap(grid) : null), [grid]);
+
+  // ITCZ + season から bands を導出し、ビットマップとセンターラインの両方で再利用する
+  const bands = useMemo(
+    () => (itcz ? computeBandPoints(itcz, currentSeason) : null),
+    [itcz, currentSeason],
+  );
+  const influenceBandBitmap = useMemo(
+    () => (bands && bands.length > 0 ? buildInfluenceBandBitmap(bands) : null),
+    [bands],
+  );
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -342,8 +388,8 @@ export function MapCanvas() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    drawMap(ctx, panOffsetPx, terrainBitmap, itcz, currentSeason, legendVisibility);
-  }, [panOffsetPx, terrainBitmap, itcz, currentSeason, legendVisibility]);
+    drawMap(ctx, panOffsetPx, terrainBitmap, influenceBandBitmap, bands, legendVisibility);
+  }, [panOffsetPx, terrainBitmap, influenceBandBitmap, bands, legendVisibility]);
 
   return (
     <canvas
