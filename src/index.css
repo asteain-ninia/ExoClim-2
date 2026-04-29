@@ -148,6 +148,24 @@ body {
   border-color: #dc5050;
 }
 
+.legend-swatch--wind {
+  background: transparent;
+  border-color: #aac8e0;
+  position: relative;
+}
+
+.legend-swatch--wind::before {
+  content: '→';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aac8e0;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
 /* === Parameter / Legend panel (fieldset / legend pattern) === */
 
 .param-group {

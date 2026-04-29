@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
-import { DEFAULT_ITCZ_STEP_PARAMS } from '@/sim/01_itcz';
+import { DEFAULT_ITCZ_STEP_PARAMS, DEFAULT_WIND_BELT_STEP_PARAMS } from '@/sim';
 import {
   EMPTY_PIPELINE_CACHE,
   runPipeline,
@@ -11,6 +11,7 @@ const baseInputs = (): PipelineInputs => ({
   planet: EARTH_PLANET_PARAMS,
   grid: createGrid(2),
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
+  windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
 });
 
 describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ骨格）', () => {
@@ -49,6 +50,7 @@ describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ�
         planet: { ...inputs1.planet },
         grid: inputs1.grid,
         itczParams: { ...inputs1.itczParams },
+        windBeltParams: { ...inputs1.windBeltParams },
       };
       const second = runPipeline(inputs2, first.cache);
       expect(second.output.cacheHits.itcz).toBe(true);

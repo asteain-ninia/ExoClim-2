@@ -1,0 +1,85 @@
+// P4-6 Step 2 風帯の E2E 検証。
+// 仕様: [docs/spec/02_風帯.md §4 / §5] / [要件定義書.md §2.2.2]。
+
+import { expect, test, type Page } from '@playwright/test';
+
+async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
+  await page.getByTestId(testId).evaluate((el, v) => {
+    const input = el as HTMLInputElement;
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set;
+    if (nativeSetter) {
+      nativeSetter.call(input, v);
+    } else {
+      input.value = v;
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
+async function canvasFingerprint(page: Page): Promise<number> {
+  return await page.locator('[data-testid="map-canvas"]').evaluate((canvas) => {
+    const ctx = (canvas as HTMLCanvasElement).getContext('2d');
+    if (!ctx) return 0;
+    const w = (canvas as HTMLCanvasElement).width;
+    const h = (canvas as HTMLCanvasElement).height;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4 * 16) {
+      sum += (data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0);
+    }
+    return sum;
+  });
+}
+
+test.describe('P4-6: Step 2 風帯', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => {
+      const c = document.querySelector('[data-testid="map-canvas"]') as HTMLCanvasElement | null;
+      if (!c) return false;
+      const ctx = c.getContext('2d');
+      if (!ctx) return false;
+      const px = ctx.getImageData(c.width / 2, c.height / 2, 1, 1).data;
+      return (px[0] ?? 0) > 0 || (px[1] ?? 0) > 0 || (px[2] ?? 0) > 0;
+    });
+    await page.waitForTimeout(200);
+  });
+
+  test('Step 2 風帯パネル（3 スライダー）が表示される', async ({ page }) => {
+    await expect(page.getByTestId('param-group-wind-belt')).toBeVisible();
+    await expect(page.getByTestId('slider-wind-subtropical-shift')).toBeVisible();
+    await expect(page.getByTestId('slider-wind-continental-anomaly')).toBeVisible();
+    await expect(page.getByTestId('slider-wind-mean-speed')).toBeVisible();
+  });
+
+  test('凡例に「卓越風」トグルが表示され、既定で ON', async ({ page }) => {
+    await expect(page.getByTestId('legend-wind-vectors')).toBeVisible();
+    await expect(page.getByTestId('legend-wind-vectors')).toBeChecked();
+  });
+
+  test('卓越風トグルを OFF にすると Canvas 描画が変わる（風矢印が消える）', async ({ page }) => {
+    const beforeOff = await canvasFingerprint(page);
+    await page.getByTestId('legend-wind-vectors').uncheck();
+    await page.waitForTimeout(100);
+    const afterOff = await canvasFingerprint(page);
+    expect(afterOff).not.toBe(beforeOff);
+  });
+
+  test('卓越風 代表速さスライダーを変えると Canvas 描画が変わる', async ({ page }) => {
+    const before = await canvasFingerprint(page);
+    await setRangeValue(page, 'slider-wind-mean-speed', '15');
+    await page.waitForTimeout(200);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
+
+  test('Step 2 風帯既定値（地球プリセット）が初期表示される', async ({ page }) => {
+    await expect(page.getByTestId('slider-wind-subtropical-shift')).toHaveValue('5');
+    await expect(page.getByTestId('slider-wind-continental-anomaly')).toHaveValue('5');
+    await expect(page.getByTestId('slider-wind-mean-speed')).toHaveValue('5');
+  });
+});

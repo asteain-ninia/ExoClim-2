@@ -8,7 +8,7 @@
 //     （Vitest は node 環境のため Web Worker のフルセット動作は再現困難）。
 
 import type { Grid, PlanetParams } from '@/domain';
-import type { ITCZStepParams } from '@/sim/01_itcz';
+import type { ITCZStepParams, WindBeltStepParams } from '@/sim';
 import {
   EMPTY_PIPELINE_CACHE,
   runPipeline,
@@ -65,6 +65,7 @@ interface WorkerRunRequest {
   readonly id: number;
   readonly planet: PlanetParams;
   readonly itczParams: ITCZStepParams;
+  readonly windBeltParams: WindBeltStepParams;
 }
 
 export type WorkerInboundMessage = WorkerGridUpdateRequest | WorkerRunRequest;
@@ -121,6 +122,7 @@ export function createWorkerPipelineBridge(): PipelineBridge {
           id,
           planet: inputs.planet,
           itczParams: inputs.itczParams,
+          windBeltParams: inputs.windBeltParams,
         };
         worker.postMessage(runMessage);
       });

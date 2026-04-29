@@ -15,7 +15,12 @@ import {
   type PlanetParams,
   type TerrainSource,
 } from '@/domain';
-import { DEFAULT_ITCZ_STEP_PARAMS, type ITCZStepParams } from '@/sim/01_itcz';
+import {
+  DEFAULT_ITCZ_STEP_PARAMS,
+  DEFAULT_WIND_BELT_STEP_PARAMS,
+  type ITCZStepParams,
+  type WindBeltStepParams,
+} from '@/sim';
 
 /**
  * アプリ初期表示で用いる地形ソース。
@@ -33,6 +38,7 @@ const DEFAULT_INITIAL_TERRAIN: TerrainSource = {
 export interface ParamsState {
   readonly planet: PlanetParams;
   readonly itczParams: ITCZStepParams;
+  readonly windBeltParams: WindBeltStepParams;
 }
 
 export interface ParamsActions {
@@ -46,6 +52,8 @@ export interface ParamsActions {
   readonly setTerrain: (terrain: TerrainSource) => void;
   /** Step 1 ITCZ パラメータを部分更新する。 */
   readonly setITCZParams: (patch: Partial<ITCZStepParams>) => void;
+  /** Step 2 風帯パラメータを部分更新する。 */
+  readonly setWindBeltParams: (patch: Partial<WindBeltStepParams>) => void;
   /** 初期値（地球プリセット + デフォルト Step パラメータ）に戻す。 */
   readonly reset: () => void;
 }
@@ -55,6 +63,7 @@ export type ParamsStore = ParamsState & ParamsActions;
 const INITIAL_PARAMS_STATE: ParamsState = {
   planet: { ...EARTH_PLANET_PARAMS, terrain: DEFAULT_INITIAL_TERRAIN },
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
+  windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
 };
 
 /**
@@ -83,6 +92,8 @@ export const createParamsStore = () =>
       set((state) => ({ planet: { ...state.planet, terrain } })),
     setITCZParams: (patch) =>
       set((state) => ({ itczParams: { ...state.itczParams, ...patch } })),
+    setWindBeltParams: (patch) =>
+      set((state) => ({ windBeltParams: { ...state.windBeltParams, ...patch } })),
     reset: () => set(INITIAL_PARAMS_STATE),
   }));
 

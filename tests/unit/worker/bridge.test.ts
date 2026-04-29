@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
-import { DEFAULT_ITCZ_STEP_PARAMS } from '@/sim/01_itcz';
+import { DEFAULT_ITCZ_STEP_PARAMS, DEFAULT_WIND_BELT_STEP_PARAMS } from '@/sim';
 import {
   createDirectPipelineBridge,
   type PipelineBridge,
@@ -11,6 +11,7 @@ const baseInputs = (): PipelineInputs => ({
   planet: EARTH_PLANET_PARAMS,
   grid: createGrid(2),
   itczParams: DEFAULT_ITCZ_STEP_PARAMS,
+  windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
 });
 
 describe('worker/bridge: createDirectPipelineBridge', () => {

@@ -7,3 +7,4 @@ export { OrbitalSliders } from './OrbitalSliders';
 export { PlanetBodySliders } from './PlanetBodySliders';
 export { Slider } from './Slider';
 export { TerrainSourceSelector } from './TerrainSourceSelector';
+export { WindBeltStepParamsSliders } from './WindBeltStepParamsSliders';

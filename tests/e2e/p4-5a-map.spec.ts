@@ -24,16 +24,24 @@ async function canvasPixelChecksum(page: Page): Promise<number> {
 test.describe('P4-5a Canvas 2D マップビュー', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    // pipeline 初回実行 + Canvas 描画が完了するまで待つ
-    await page.waitForFunction(() => {
-      const c = document.querySelector('[data-testid="map-canvas"]') as HTMLCanvasElement | null;
-      if (!c) return false;
-      const ctx = c.getContext('2d');
-      if (!ctx) return false;
-      const data = ctx.getImageData(c.width / 2, c.height / 2, 1, 1).data;
-      // 中央ピクセルが背景色だけでなく描画済みなら ok（緑: pipeline 結果反映を待つ）
-      return data[0] !== undefined;
-    });
+    // pipeline 初回実行 + ITCZ 帯描画が完了するまで待つ（赤系ピクセルが現れるのを目印）
+    await page.waitForFunction(
+      () => {
+        const c = document.querySelector('[data-testid="map-canvas"]') as HTMLCanvasElement | null;
+        if (!c) return false;
+        const ctx = c.getContext('2d');
+        if (!ctx) return false;
+        const data = ctx.getImageData(0, 0, c.width, c.height).data;
+        // ITCZ 影響帯 rgba(220, 80, 80, 0.25) blended over terrain → R が G より顕著に高いピクセルを探す
+        for (let i = 0; i < data.length; i += 4 * 64) {
+          const r = data[i] ?? 0;
+          const g = data[i + 1] ?? 0;
+          if (r > 70 && r > g + 25) return true;
+        }
+        return false;
+      },
+      { timeout: 10_000 },
+    );
   });
 
   test('Canvas が固定サイズ（960x480）で表示される（[要件定義書.md §2.3.1]）', async ({ page }) => {

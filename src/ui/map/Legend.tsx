@@ -40,6 +40,18 @@ export function Legend() {
             ITCZ 影響帯（既定 ±15°）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.windVectors}
+              onChange={(e) => setLegendVisibility({ windVectors: e.target.checked })}
+              data-testid="legend-wind-vectors"
+            />
+            <span className="legend-swatch legend-swatch--wind" aria-hidden="true" />
+            卓越風（Step 2、矢印）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

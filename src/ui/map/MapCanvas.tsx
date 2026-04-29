@@ -12,7 +12,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { Cell, Grid, ITCZResult } from '@/domain';
+import type { Cell, Grid, GridMap, ITCZResult, WindVector } from '@/domain';
 import { useParamsStore } from '@/store/params';
 import { useResultsStore } from '@/store/results';
 import {
@@ -285,6 +285,79 @@ function drawInfluenceBandBitmap(
   ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
+/**
+ * 風ベクトル（卓越風）を等間隔の格子点に短い矢印として描く。
+ *
+ * - サンプル間隔: 経度 30°・緯度 15°（密集回避と読み取りやすさのバランス）
+ * - 矢印長: 風速に比例（meanWindSpeedMps 5 m/s で約 14 px）
+ * - 矢印色: 薄青（地形・ITCZ と分離する寒色系）
+ * - 経度循環: 3 オフセット（norm-W / norm / norm+W）で重ね描き
+ *
+ * v 軸（南北）は Canvas Y 軸と反転（北 = Y 小）するので、描画では `-vMps` を使う。
+ */
+function drawWindVectors(
+  ctx: CanvasRenderingContext2D,
+  windField: GridMap<WindVector>,
+  grid: Grid,
+  normPanPx: number,
+): void {
+  const sampleLatStepDeg = 15;
+  const sampleLonStepDeg = 30;
+  // m/s 1 を Canvas px に換算する係数（5 m/s で約 14 px の矢印長）
+  const speedToPx = 14 / 5;
+  const arrowHeadPx = 4;
+
+  ctx.strokeStyle = '#aac8e0';
+  ctx.fillStyle = '#aac8e0';
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+
+  for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+    for (let lat = -75; lat <= 75; lat += sampleLatStepDeg) {
+      // grid の lat→i: latitudeDeg = -90 + (i + 0.5) * resolutionDeg
+      const i = Math.round((lat + 90) / grid.resolutionDeg - 0.5);
+      const row = windField[i];
+      if (!row) continue;
+      for (let lon = -180 + sampleLonStepDeg / 2; lon < 180; lon += sampleLonStepDeg) {
+        const j = Math.round((lon + 180) / grid.resolutionDeg - 0.5);
+        const wind = row[j];
+        if (!wind) continue;
+
+        const { x: x0, y: y0 } = projectRaw(lat, lon, VIEWPORT, drawOffset);
+        if (x0 < -50 || x0 > CANVAS_WIDTH_PX + 50) continue;
+
+        // 風ベクトルから矢印終点へ。Canvas の Y は北 = 0、南 = height。v(北向き正) は -dy で反映。
+        const dx = wind.uMps * speedToPx;
+        const dy = -wind.vMps * speedToPx;
+        const x1 = x0 + dx;
+        const y1 = y0 + dy;
+
+        // 線
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+
+        // 矢印先端（簡易三角）
+        const length = Math.sqrt(dx * dx + dy * dy);
+        if (length > 1) {
+          const headDx = (dx / length) * arrowHeadPx;
+          const headDy = (dy / length) * arrowHeadPx;
+          // 直交方向の半幅
+          const perpDx = -headDy * 0.6;
+          const perpDy = headDx * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x1 - headDx + perpDx, y1 - headDy + perpDy);
+          ctx.lineTo(x1 - headDx - perpDx, y1 - headDy - perpDy);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+  }
+}
+
 /** ITCZ 中心線をストロークする。3 オフセットで循環描画し、隣接インスタンス間も連結する。 */
 function drawCenterLine(
   ctx: CanvasRenderingContext2D,
@@ -311,6 +384,8 @@ function drawMap(
   terrainBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
+  windField: GridMap<WindVector> | null,
+  grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
   const norm = normalizePanOffsetPx(panOffsetPx, VIEWPORT);
@@ -331,6 +406,9 @@ function drawMap(
   if (legendVisibility.itczCenterLine && centerLineBands && centerLineBands.length > 0) {
     drawCenterLine(ctx, centerLineBands, norm);
   }
+  if (legendVisibility.windVectors && windField && grid) {
+    drawWindVectors(ctx, windField, grid, norm);
+  }
 }
 
 /**
@@ -343,6 +421,7 @@ export function MapCanvas() {
   const dragRef = useRef<{ startClientX: number; startOffset: number } | null>(null);
 
   const itcz = useResultsStore((s) => s.itcz);
+  const windBelt = useResultsStore((s) => s.windBelt);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
@@ -362,6 +441,38 @@ export function MapCanvas() {
     () => (bands && bands.length > 0 ? buildInfluenceBandBitmap(bands) : null),
     [bands],
   );
+
+  // 風ベクトル（Step 2）。年平均では月別を平均、月別ならその月のフィールドを使う
+  const windField = useMemo<GridMap<WindVector> | null>(() => {
+    if (!windBelt) return null;
+    if (currentSeason === 'annual') {
+      // 年平均: 12 ヶ月の風ベクトルをセル単位で平均
+      const months = windBelt.monthlyPrevailingWind;
+      const firstMonth = months[0];
+      if (!firstMonth) return null;
+      const rows = firstMonth.length;
+      const cols = firstMonth[0]?.length ?? 0;
+      const averaged: WindVector[][] = new Array(rows);
+      for (let i = 0; i < rows; i++) {
+        const row: WindVector[] = new Array(cols);
+        for (let j = 0; j < cols; j++) {
+          let sumU = 0;
+          let sumV = 0;
+          for (const monthField of months) {
+            const cell = monthField[i]?.[j];
+            if (cell) {
+              sumU += cell.uMps;
+              sumV += cell.vMps;
+            }
+          }
+          row[j] = { uMps: sumU / months.length, vMps: sumV / months.length };
+        }
+        averaged[i] = row;
+      }
+      return averaged;
+    }
+    return windBelt.monthlyPrevailingWind[currentSeason] ?? null;
+  }, [windBelt, currentSeason]);
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -390,8 +501,17 @@ export function MapCanvas() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    drawMap(ctx, panOffsetPx, terrainBitmap, influenceBandBitmap, bands, legendVisibility);
-  }, [panOffsetPx, terrainBitmap, influenceBandBitmap, bands, legendVisibility]);
+    drawMap(
+      ctx,
+      panOffsetPx,
+      terrainBitmap,
+      influenceBandBitmap,
+      bands,
+      windField,
+      grid,
+      legendVisibility,
+    );
+  }, [panOffsetPx, terrainBitmap, influenceBandBitmap, bands, windField, grid, legendVisibility]);
 
   return (
     <canvas

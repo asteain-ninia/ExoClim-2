@@ -22,11 +22,13 @@ export type SeasonPhaseView = 'annual' | number;
 
 /**
  * 凡例・補助線の表示／非表示フラグ集合（[要件定義書.md §2.3.2]）。
- * Step 1 ITCZ 関連のみ初稿。Step 2〜7 連結時に項目を追加する。
+ * Step 1 ITCZ + Step 2 風帯。Step 3〜7 連結時に項目を追加する。
  */
 export interface LegendVisibility {
   readonly itczCenterLine: boolean;
   readonly itczInfluenceBand: boolean;
+  /** Step 2 風帯の卓越風ベクトル（小さな矢印）の表示トグル。 */
+  readonly windVectors: boolean;
 }
 
 export interface UIState {
@@ -51,6 +53,7 @@ const INITIAL_UI_STATE: UIState = {
   legendVisibility: {
     itczCenterLine: true,
     itczInfluenceBand: true,
+    windVectors: true,
   },
 };
 

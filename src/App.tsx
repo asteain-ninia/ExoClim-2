@@ -17,6 +17,7 @@ import {
   PlanetBodySliders,
   SeasonSelector,
   TerrainSourceSelector,
+  WindBeltStepParamsSliders,
 } from '@/ui';
 import { createWorkerPipelineBridge } from '@/worker';
 
@@ -48,6 +49,7 @@ export function App() {
           <AtmosphereOceanSliders />
           <TerrainSourceSelector />
           <ITCZStepParamsSliders />
+          <WindBeltStepParamsSliders />
         </section>
       </main>
     </div>

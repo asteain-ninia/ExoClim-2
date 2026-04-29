@@ -4,3 +4,6 @@
 
 export type { ITCZStepParams } from './01_itcz';
 export { DEFAULT_ITCZ_STEP_PARAMS, computeITCZ, solarDeclinationDeg } from './01_itcz';
+
+export type { WindBeltStepParams } from './02_wind_belt';
+export { DEFAULT_WIND_BELT_STEP_PARAMS, computeWindBelt } from './02_wind_belt';

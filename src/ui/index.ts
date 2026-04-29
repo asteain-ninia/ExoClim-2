@@ -16,4 +16,5 @@ export {
   PlanetBodySliders,
   Slider,
   TerrainSourceSelector,
+  WindBeltStepParamsSliders,
 } from './parameters';

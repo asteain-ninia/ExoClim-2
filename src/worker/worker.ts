@@ -42,6 +42,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => 
       planet: message.planet,
       grid: currentGrid,
       itczParams: message.itczParams,
+      windBeltParams: message.windBeltParams,
     };
     const result = runPipeline(inputs, cache);
     cache = result.cache;
