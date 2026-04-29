@@ -13,6 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { Cell, Grid, ITCZResult } from '@/domain';
+import { useParamsStore } from '@/store/params';
 import { useResultsStore } from '@/store/results';
 import {
   useUIStore,
@@ -43,49 +44,47 @@ interface BandPoint {
 
 /**
  * 現在の季節選択（年平均 or 月）に対応するバンド点列を組み立てる。
- * 年平均では月別の south/north 境界を平均する。
+ *
+ * 表示用の影響帯は **中心線 ± halfWidthDeg の一様幅** とし、ITCZResult が保持する
+ * `southBoundLatitudeDeg` / `northBoundLatitudeDeg`（[docs/spec/01_ITCZ.md §4.5] の
+ * 山岳横断切取が反映済みの clipped 値）は **本表示では使わない**。
+ *
+ * 理由: 山岳切取は「内陸の高地で band が局所的にゼロ幅まで縮退する」現象を生み、
+ * 海岸線・地形と相関した断続的な視覚ノイズになる。可視化用としては煩雑。
+ * 切取済みの south/north は下流 Step 2/3 が消費するため ITCZResult 側に保持し続け、
+ * 表示専用の計算を本ステージで行う。デバッグビュー（[要件定義書.md §2.3.5]）が
+ * 整備されたら、切取データはそちらで個別に提示する。
+ *
+ * 年平均では月別中心線を `itcz.annualMeanCenterLatitudeDeg` から取得する。
  */
 function computeBandPoints(
   itcz: ITCZResult,
   currentSeason: SeasonPhaseView,
+  halfWidthDeg: number,
 ): readonly BandPoint[] {
   const annualCenters = itcz.annualMeanCenterLatitudeDeg;
   const longitudeCount = annualCenters.length;
   if (longitudeCount === 0) return [];
   const lonStep = 360 / longitudeCount;
 
+  const buildPoint = (longitudeIndex: number, centerLatDeg: number): BandPoint => ({
+    longitudeDeg: -180 + (longitudeIndex + 0.5) * lonStep,
+    centerLatDeg,
+    southLatDeg: Math.max(-90, centerLatDeg - halfWidthDeg),
+    northLatDeg: Math.min(90, centerLatDeg + halfWidthDeg),
+  });
+
   if (currentSeason === 'annual') {
     const points: BandPoint[] = new Array(longitudeCount);
     for (let j = 0; j < longitudeCount; j++) {
-      let sumSouth = 0;
-      let sumNorth = 0;
-      let count = 0;
-      for (const monthBands of itcz.monthlyBands) {
-        const mb = monthBands[j];
-        if (mb) {
-          sumSouth += mb.southBoundLatitudeDeg;
-          sumNorth += mb.northBoundLatitudeDeg;
-          count++;
-        }
-      }
-      points[j] = {
-        longitudeDeg: -180 + (j + 0.5) * lonStep,
-        centerLatDeg: annualCenters[j] ?? 0,
-        southLatDeg: count > 0 ? sumSouth / count : 0,
-        northLatDeg: count > 0 ? sumNorth / count : 0,
-      };
+      points[j] = buildPoint(j, annualCenters[j] ?? 0);
     }
     return points;
   }
 
   const monthBands = itcz.monthlyBands[currentSeason];
   if (!monthBands) return [];
-  return monthBands.map<BandPoint>((band, j) => ({
-    longitudeDeg: -180 + (j + 0.5) * lonStep,
-    centerLatDeg: band.centerLatitudeDeg,
-    southLatDeg: band.southBoundLatitudeDeg,
-    northLatDeg: band.northBoundLatitudeDeg,
-  }));
+  return monthBands.map<BandPoint>((band, j) => buildPoint(j, band.centerLatitudeDeg));
 }
 
 interface RGB {
@@ -347,14 +346,17 @@ export function MapCanvas() {
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
+  const baseInfluenceHalfWidthDeg = useParamsStore(
+    (s) => s.itczParams.baseInfluenceHalfWidthDeg,
+  );
 
   // grid 変化時にオフスクリーン地形ビットマップを再構築する（地形生成は重いので memoize）
   const terrainBitmap = useMemo(() => (grid ? buildTerrainBitmap(grid) : null), [grid]);
 
-  // ITCZ + season から bands を導出し、ビットマップとセンターラインの両方で再利用する
+  // ITCZ + season + halfwidth から bands を導出し、ビットマップとセンターラインの両方で再利用する
   const bands = useMemo(
-    () => (itcz ? computeBandPoints(itcz, currentSeason) : null),
-    [itcz, currentSeason],
+    () => (itcz ? computeBandPoints(itcz, currentSeason, baseInfluenceHalfWidthDeg) : null),
+    [itcz, currentSeason, baseInfluenceHalfWidthDeg],
   );
   const influenceBandBitmap = useMemo(
     () => (bands && bands.length > 0 ? buildInfluenceBandBitmap(bands) : null),
