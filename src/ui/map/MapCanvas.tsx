@@ -7,11 +7,12 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { ITCZResult } from '@/domain';
+import type { Cell, Grid, ITCZResult } from '@/domain';
 import { useResultsStore } from '@/store/results';
 import {
   useUIStore,
@@ -85,6 +86,95 @@ function computeBandPoints(
     southLatDeg: band.southBoundLatitudeDeg,
     northLatDeg: band.northBoundLatitudeDeg,
   }));
+}
+
+interface RGB {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+/**
+ * セルの陸海・標高・緯度から表示色を決める。
+ * 陸地は 4 段階（低地・高原・山地・高山）、海洋は深さで 3 段階、極域（|lat| > 75°）は氷化。
+ */
+function cellColor(cell: Cell): RGB {
+  const isHighLatitude = Math.abs(cell.latitudeDeg) > 75;
+  if (cell.isLand) {
+    let base: RGB;
+    const elevation = cell.elevationMeters;
+    if (elevation < 500) base = { r: 0x4a, g: 0x6b, b: 0x3e };
+    else if (elevation < 1500) base = { r: 0x6b, g: 0x6b, b: 0x4a };
+    else if (elevation < 3000) base = { r: 0x8a, g: 0x7a, b: 0x5a };
+    else base = { r: 0xb0, g: 0xa8, b: 0x90 };
+    if (isHighLatitude) {
+      // 高緯度の陸地は氷雪で覆われる近似（白とのブレンド）
+      return {
+        r: Math.round(base.r * 0.4 + 255 * 0.6),
+        g: Math.round(base.g * 0.4 + 255 * 0.6),
+        b: Math.round(base.b * 0.4 + 255 * 0.6),
+      };
+    }
+    return base;
+  }
+  // 海洋
+  if (isHighLatitude) {
+    // 極海は薄青（海氷の近似、Step 3 海流の海氷マスクが入れば置換）
+    return { r: 0xa0, g: 0xc0, b: 0xd0 };
+  }
+  const depth = -cell.elevationMeters;
+  if (depth < 200) return { r: 0x1a, g: 0x3c, b: 0x5c };
+  if (depth < 2000) return { r: 0x10, g: 0x2c, b: 0x4a };
+  return { r: 0x08, g: 0x1c, b: 0x32 };
+}
+
+/**
+ * Grid から陸海・標高で塗り分けたオフスクリーン Canvas を構築する（grid 解像度のピクセルで生成）。
+ * 主 Canvas には drawImage で拡大コピーする。pan の循環表示は drawImage を複数 offset で繰り返して実現。
+ */
+function buildTerrainBitmap(grid: Grid): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = cols;
+  offCanvas.height = rows;
+  const offCtx = offCanvas.getContext('2d');
+  if (!offCtx) return offCanvas;
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+  // grid.cells は南→北（i=0 が南極側）。ImageData は y=0 が上端。よって行を反転して書き込む。
+  for (let r = 0; r < rows; r++) {
+    const gridRow = grid.cells[r];
+    if (!gridRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const cell = gridRow[c];
+      if (!cell) continue;
+      const offset = (imageY * cols + c) * 4;
+      const color = cellColor(cell);
+      data[offset] = color.r;
+      data[offset + 1] = color.g;
+      data[offset + 2] = color.b;
+      data[offset + 3] = 255;
+    }
+  }
+  offCtx.putImageData(imgData, 0, 0);
+  return offCanvas;
+}
+
+/** オフスクリーン地形ビットマップを 2 オフセットで主 Canvas に描き、経度循環を実現する。 */
+function drawTerrainBitmap(
+  ctx: CanvasRenderingContext2D,
+  bitmap: HTMLCanvasElement,
+  normPanPx: number,
+): void {
+  const previousSmoothing = ctx.imageSmoothingEnabled;
+  // ピクセルアート的な見た目を保つため smoothing は切る
+  ctx.imageSmoothingEnabled = false;
+  for (const drawOffset of [normPanPx, normPanPx - CANVAS_WIDTH_PX]) {
+    ctx.drawImage(bitmap, drawOffset, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  }
+  ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
 /**
@@ -179,15 +269,20 @@ function drawCenterLine(
 function drawMap(
   ctx: CanvasRenderingContext2D,
   panOffsetPx: number,
+  terrainBitmap: HTMLCanvasElement | null,
   itcz: ITCZResult | null,
   currentSeason: SeasonPhaseView,
   legendVisibility: LegendVisibility,
 ): void {
   const norm = normalizePanOffsetPx(panOffsetPx, VIEWPORT);
 
-  // 背景（海色）
-  ctx.fillStyle = '#0e2233';
-  ctx.fillRect(0, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  if (terrainBitmap) {
+    drawTerrainBitmap(ctx, terrainBitmap, norm);
+  } else {
+    // 地形未解決時のフォールバック背景（全海洋扱い）
+    ctx.fillStyle = '#0e2233';
+    ctx.fillRect(0, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+  }
 
   drawGrid(ctx, norm);
 
@@ -213,8 +308,12 @@ export function MapCanvas() {
   const dragRef = useRef<{ startClientX: number; startOffset: number } | null>(null);
 
   const itcz = useResultsStore((s) => s.itcz);
+  const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
+
+  // grid 変化時にオフスクリーン地形ビットマップを再構築する（地形生成は重いので memoize）
+  const terrainBitmap = useMemo(() => (grid ? buildTerrainBitmap(grid) : null), [grid]);
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -243,8 +342,8 @@ export function MapCanvas() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    drawMap(ctx, panOffsetPx, itcz, currentSeason, legendVisibility);
-  }, [panOffsetPx, itcz, currentSeason, legendVisibility]);
+    drawMap(ctx, panOffsetPx, terrainBitmap, itcz, currentSeason, legendVisibility);
+  }, [panOffsetPx, terrainBitmap, itcz, currentSeason, legendVisibility]);
 
   return (
     <canvas

@@ -5,20 +5,39 @@
 //   - 本モジュールは store と bridge を疎結合に繋ぐ薄い接着剤。Step 増減時は bridge 側を拡張する。
 
 import type { StoreApi } from 'zustand';
-import { createGrid, type Grid } from '@/domain';
+import {
+  buildTerrainGrid,
+  DEFAULT_GRID_RESOLUTION_DEG,
+  type Grid,
+  type GridResolutionDeg,
+  type TerrainSource,
+} from '@/domain';
 import type { PipelineBridge } from '@/worker/bridge';
+import { deepEqual } from '@/worker/deepEqual';
 import type { PipelineInputs } from '@/worker/pipeline';
 import type { ParamsStore } from './params';
 import type { ResultsStore } from './results';
 
 export interface ConnectStoresOptions {
-  /** pipeline に渡す Grid（地形）。指定なしなら 1° 既定 Grid を 1 度だけ生成する。 */
+  /**
+   * 利用する Grid 解像度。指定なしなら {@link DEFAULT_GRID_RESOLUTION_DEG}（1°）。
+   * Grid 自体は params.planet.terrain から {@link buildTerrainGrid} で都度解決する
+   * （内部キャッシュで terrain 不変なら再生成しない）。
+   */
+  readonly resolutionDeg?: GridResolutionDeg;
+  /**
+   * テスト用に Grid を直接注入する経路。指定された場合は terrain 解決をスキップして固定 Grid を使う。
+   * 通常の利用では指定しない。
+   */
   readonly grid?: Grid;
 }
 
 /**
  * params store の変更を監視し、ブリッジで pipeline を実行して results store を更新する。
  * 起動時に 1 度初期実行する（params の現在値で results を埋める）。
+ *
+ * Grid は `params.planet.terrain` から `buildTerrainGrid` で解決し、内部にキャッシュする。
+ * terrain が同値なら再生成しない（地形生成は重い処理のため）。
  *
  * @returns 解除関数 dispose を持つオブジェクト。dispose() で購読を停止する（bridge は呼び出し側が管理）。
  */
@@ -28,10 +47,28 @@ export function connectStoresToBridge(
   bridge: PipelineBridge,
   options: ConnectStoresOptions = {},
 ): { readonly dispose: () => void } {
-  const grid = options.grid ?? createGrid(1);
+  const resolutionDeg = options.resolutionDeg ?? DEFAULT_GRID_RESOLUTION_DEG;
+
+  // terrain → grid のキャッシュ。同値の terrain なら再生成しない。
+  let cachedTerrainGrid: { source: TerrainSource; grid: Grid } | null = null;
+
+  const resolveGrid = (terrain: TerrainSource): Grid => {
+    if (options.grid) {
+      // 注入 Grid を優先（テスト用経路）
+      return options.grid;
+    }
+    if (cachedTerrainGrid && deepEqual(cachedTerrainGrid.source, terrain)) {
+      return cachedTerrainGrid.grid;
+    }
+    const grid = buildTerrainGrid(terrain, resolutionDeg);
+    cachedTerrainGrid = { source: terrain, grid };
+    return grid;
+  };
 
   const runPipelineFromCurrentParams = async (): Promise<void> => {
     const params = paramsStore.getState();
+    const grid = resolveGrid(params.planet.terrain);
+    resultsStore.getState().setGrid(grid);
     const inputs: PipelineInputs = {
       planet: params.planet,
       grid,

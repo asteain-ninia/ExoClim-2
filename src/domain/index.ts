@@ -4,6 +4,18 @@
 export type { Cell, Grid, GridResolutionDeg } from './grid';
 export { DEFAULT_GRID_RESOLUTION_DEG, createGrid } from './grid';
 
+export type { EarthLatitudeStat, ElevationBinMeters } from './earthStatistics';
+export {
+  EARTH_GLOBAL_LAND_FRACTION,
+  EARTH_LATITUDE_STATISTICS,
+  ELEVATION_BINS_METERS,
+  getEarthStatisticsAt,
+} from './earthStatistics';
+
+export { fbmSphere, hash33, noise3D, ridgeSphere } from './noise';
+
+export { buildTerrainGrid } from './terrain';
+
 export type {
   AtmosphereOceanParams,
   OrbitalParams,
