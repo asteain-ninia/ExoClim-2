@@ -13,6 +13,7 @@ import { computeITCZ, DEFAULT_ITCZ_STEP_PARAMS } from '@/sim/01_itcz';
 import { computeWindBelt, DEFAULT_WIND_BELT_STEP_PARAMS } from '@/sim/02_wind_belt';
 import {
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  __internals,
   classificationFromCorrection,
   computeOceanCurrent,
 } from '@/sim/03_ocean_current';
@@ -79,7 +80,7 @@ describe('sim/03_ocean_current: computeOceanCurrent 出力構造', () => {
     }
   });
 
-  it('streamlines・collisionPoints は最小実装で空配列', () => {
+  it('全海洋グリッドでは盆全周の亜熱帯ジャイヤ + 赤道反流の streamlines を返す（[§4.1〜§4.5]）', () => {
     const grid = baseGrid(2);
     const result = computeOceanCurrent(
       EARTH_PLANET_PARAMS,
@@ -87,9 +88,16 @@ describe('sim/03_ocean_current: computeOceanCurrent 出力構造', () => {
       baseITCZ(EARTH_PLANET_PARAMS, grid),
       baseWindBelt(EARTH_PLANET_PARAMS, grid),
     );
+    // 全海洋なら 1 盆 → 赤道反流 1 + NH ジャイヤ 4 + SH ジャイヤ 4 = 9 streamlines
     for (const month of result.monthlyStreamlines) {
-      expect(month.length).toBe(0);
+      expect(month.length).toBeGreaterThan(0);
+      // すべての streamline は 2 点以上の path を持つ
+      for (const sl of month) {
+        expect(sl.path.length).toBeGreaterThanOrEqual(2);
+        expect(['warm', 'cold', 'neutral']).toContain(sl.classification);
+      }
     }
+    // collisionPoints は最小実装では未生成
     for (const month of result.monthlyCollisionPoints) {
       expect(month.length).toBe(0);
     }
@@ -289,5 +297,109 @@ describe('sim/03_ocean_current: 決定性（[要件定義書.md §3.2]）', () =
     const a = computeOceanCurrent(EARTH_PLANET_PARAMS, grid, itcz, wind);
     const b = computeOceanCurrent(EARTH_PLANET_PARAMS, grid, itcz, wind);
     expect(a).toEqual(b);
+  });
+});
+
+describe('sim/03_ocean_current: ストリームライン（[docs/spec/03_海流.md §4.1〜§4.5]）', () => {
+  it('全海洋盆では 1 セットの「赤道反流 + NH ジャイヤ 4 + SH ジャイヤ 4」= 9 streamlines', () => {
+    const grid = baseGrid(2);
+    const result = computeOceanCurrent(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+    );
+    expect(result.monthlyStreamlines[0]?.length).toBe(9);
+  });
+
+  it('warm 分類のストリームラインは少なくとも 1 本存在する', () => {
+    const grid = baseGrid(2);
+    const result = computeOceanCurrent(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+    );
+    const month = result.monthlyStreamlines[0]!;
+    const warmCount = month.filter((s) => s.classification === 'warm').length;
+    const coldCount = month.filter((s) => s.classification === 'cold').length;
+    expect(warmCount).toBeGreaterThanOrEqual(2); // NH + SH の暖流
+    expect(coldCount).toBeGreaterThanOrEqual(2); // NH + SH の寒流
+  });
+
+  it('陸地が多すぎて盆幅 < streamlineBasinMinWidthDeg のときは streamlines が空', () => {
+    // 全陸地グリッド → 盆検出されない
+    const grid = mapGridCells(baseGrid(2), (cell) => ({
+      ...cell,
+      isLand: true,
+      continentId: 'all-land',
+    }));
+    const result = computeOceanCurrent(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+    );
+    expect(result.monthlyStreamlines[0]?.length).toBe(0);
+  });
+
+  it('findOceanBasinsAtLatitudeIndex: 全海洋ロウは [-180, 180] の 1 区間を返す', () => {
+    const grid = baseGrid(2);
+    const eqI = Math.round((0 + 90) / grid.resolutionDeg - 0.5);
+    const basins = __internals.findOceanBasinsAtLatitudeIndex(grid, eqI, 30);
+    expect(basins.length).toBe(1);
+    expect(basins[0]!.startLonDeg).toBe(-180);
+    expect(basins[0]!.endLonDeg).toBe(180);
+  });
+
+  it('findOceanBasinsAtLatitudeIndex: 大陸を挟むと盆が分割される', () => {
+    // 経度 0–60° に陸地ベルトを置く
+    const grid = mapGridCells(baseGrid(2), (cell) =>
+      cell.longitudeDeg >= 0 && cell.longitudeDeg <= 60
+        ? { ...cell, isLand: true, continentId: 'belt' }
+        : cell,
+    );
+    const eqI = Math.round((0 + 90) / grid.resolutionDeg - 0.5);
+    const basins = __internals.findOceanBasinsAtLatitudeIndex(grid, eqI, 30);
+    // 残った海洋区間は経度 60° 〜 0°（経度循環で分断された 1 区間、wrap-around 含む）
+    expect(basins.length).toBeGreaterThanOrEqual(1);
+    // 残海洋幅は 300° 程度
+    const widths = basins.map((b) => {
+      const w = b.endLonDeg >= b.startLonDeg ? b.endLonDeg - b.startLonDeg : 360 - (b.startLonDeg - b.endLonDeg);
+      return w;
+    });
+    expect(Math.max(...widths)).toBeGreaterThan(280);
+  });
+
+  it('逆行惑星（rotationSign = -1）では赤道反流の向きが反転', () => {
+    const retrograde: PlanetParams = {
+      ...EARTH_PLANET_PARAMS,
+      body: { ...EARTH_PLANET_PARAMS.body, rotationDirection: 'retrograde' },
+    };
+    const proGyres = __internals.buildAllStreamlines(baseGrid(2), 1, 30, 7, 32, 10);
+    const retroGyres = __internals.buildAllStreamlines(baseGrid(2), -1, 30, 7, 32, 10);
+    // 赤道反流は最初の streamline（順行と逆行で path[0].lon が逆転）
+    const proFirst = proGyres[0]!;
+    const retroFirst = retroGyres[0]!;
+    // 順行と逆行で開始経度が異なる（東向き vs 西向き）
+    expect(proFirst.path[0]!.longitudeDeg).not.toBe(retroFirst.path[0]!.longitudeDeg);
+    // computeOceanCurrent 経由でも反転される
+    const proResult = computeOceanCurrent(
+      EARTH_PLANET_PARAMS,
+      baseGrid(2),
+      baseITCZ(),
+      baseWindBelt(),
+      DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+    );
+    const retroResult = computeOceanCurrent(
+      retrograde,
+      baseGrid(2),
+      baseITCZ(retrograde),
+      baseWindBelt(retrograde),
+      DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+    );
+    expect(proResult.monthlyStreamlines[0]?.[0]?.path[0]?.longitudeDeg).not.toBe(
+      retroResult.monthlyStreamlines[0]?.[0]?.path[0]?.longitudeDeg,
+    );
   });
 });

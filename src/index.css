@@ -171,6 +171,19 @@ body {
   border-color: #d8e6f4;
 }
 
+.legend-swatch--stream-warm {
+  background: #ff7040;
+  border-color: #ff5020;
+  width: 14px;
+  height: 2px;
+}
+.legend-swatch--stream-cold {
+  background: #40a0ff;
+  border-color: #2080e0;
+  width: 14px;
+  height: 2px;
+}
+
 .legend-swatch--final-wind {
   background: transparent;
   border-color: #f0d870;

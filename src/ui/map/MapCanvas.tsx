@@ -16,6 +16,7 @@ import type {
   AirflowResult,
   Cell,
   ClimateZoneResult,
+  CurrentStreamline,
   Grid,
   GridMap,
   IsothermLine,
@@ -1007,6 +1008,66 @@ function drawWindVectors(
   }
 }
 
+/**
+ * 海流ストリームライン（[docs/spec/03_海流.md §4.1〜§4.5]）を分類別の色で描画する。
+ *
+ * - warm: 暖色（橙赤）
+ * - cold: 寒色（水色）
+ * - neutral: 薄水色（赤道流・中緯度東向き反転など）
+ *
+ * 経度循環は 3 オフセット（norm-W / norm / norm+W）で重ね描き。
+ * セグメントの両端が全タイル外なら描画スキップ（[開発ガイド.md §6.2.2]）。
+ * 経度ラップで dx > W/2 の極端なジャンプは別セグメントとして分断する。
+ */
+function drawCurrentStreamlines(
+  ctx: CanvasRenderingContext2D,
+  streamlines: ReadonlyArray<CurrentStreamline>,
+  normPanPx: number,
+): void {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const stream of streamlines) {
+    if (stream.path.length < 2) continue;
+    let strokeStyle: string;
+    let lineWidth: number;
+    switch (stream.classification) {
+      case 'warm':
+        strokeStyle = '#ff7040';
+        lineWidth = 2;
+        break;
+      case 'cold':
+        strokeStyle = '#40a0ff';
+        lineWidth = 2;
+        break;
+      default:
+        strokeStyle = '#a0c8e0';
+        lineWidth = 1.4;
+    }
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+      ctx.beginPath();
+      let prev: { x: number; y: number } | null = null;
+      for (const point of stream.path) {
+        const { x, y } = projectRaw(point.latitudeDeg, point.longitudeDeg, VIEWPORT, drawOffset);
+        if (!prev) {
+          ctx.moveTo(x, y);
+        } else {
+          // 経度ラップ起因の長距離ジャンプを分断
+          const dx = Math.abs(x - prev.x);
+          if (dx > CANVAS_WIDTH_PX / 2) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        prev = { x, y };
+      }
+      ctx.stroke();
+    }
+  }
+}
+
 /** ITCZ 中心線をストロークする。3 オフセットで循環描画し、隣接インスタンス間も連結する。 */
 function drawCenterLine(
   ctx: CanvasRenderingContext2D,
@@ -1043,6 +1104,7 @@ function drawMap(
   finalWindField: GridMap<WindVector> | null,
   pressureCenters: ReadonlyArray<PressureCenter> | null,
   isotherms: ReadonlyArray<IsothermLine> | null,
+  oceanStreamlines: ReadonlyArray<CurrentStreamline> | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -1088,6 +1150,10 @@ function drawMap(
   }
   if (legendVisibility.itczCenterLine && centerLineBands && centerLineBands.length > 0) {
     drawCenterLine(ctx, centerLineBands, norm);
+  }
+  // 海流ストリームライン（[docs/spec/03_海流.md §4.1〜§4.5]）— grid 線の上、矢印の前
+  if (legendVisibility.oceanStreamlines && oceanStreamlines && oceanStreamlines.length > 0) {
+    drawCurrentStreamlines(ctx, oceanStreamlines, norm);
   }
   if (legendVisibility.windVectors && windField && grid) {
     drawWindVectors(ctx, windField, grid, norm);
@@ -1178,6 +1244,14 @@ export function MapCanvas() {
     () => (climateZone && grid ? buildClimateZoneBitmap(climateZone, grid) : null),
     [climateZone, grid],
   );
+
+  // 海流ストリームライン（oceanCurrent + currentSeason 依存）。
+  // 現状は月別差なし（同一値）だが、UI 側は currentSeason に追従して取り出す形にしておく。
+  const oceanStreamlinesForSeason = useMemo<ReadonlyArray<CurrentStreamline> | null>(() => {
+    if (!oceanCurrent) return null;
+    const monthIndex = currentSeason === 'annual' ? 0 : currentSeason;
+    return oceanCurrent.monthlyStreamlines[monthIndex] ?? null;
+  }, [oceanCurrent, currentSeason]);
 
   // 等温線（temperature + currentSeason 依存）
   const isothermsForSeason = useMemo<ReadonlyArray<IsothermLine> | null>(() => {
@@ -1355,6 +1429,7 @@ export function MapCanvas() {
       finalWindField,
       pressureCenters,
       isothermsForSeason,
+      oceanStreamlinesForSeason,
       grid,
       legendVisibility,
     );
@@ -1373,6 +1448,7 @@ export function MapCanvas() {
     finalWindField,
     pressureCenters,
     isothermsForSeason,
+    oceanStreamlinesForSeason,
     grid,
     legendVisibility,
   ]);

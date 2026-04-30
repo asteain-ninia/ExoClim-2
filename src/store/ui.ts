@@ -31,6 +31,8 @@ export interface LegendVisibility {
   readonly windVectors: boolean;
   /** Step 3 海流の暖流（暖色）／寒流（寒色）overlay の表示トグル。 */
   readonly oceanCurrents: boolean;
+  /** Step 3 海流のストリームライン（流線）表示トグル（[docs/spec/03_海流.md §4.1〜§4.5]）。 */
+  readonly oceanStreamlines: boolean;
   /** Step 3 海流の海氷マスクの表示トグル。 */
   readonly seaIce: boolean;
   /** Step 4 気流の最終地表風ベクトル overlay の表示トグル（ON にすると Step 2 矢印を置換）。 */
@@ -86,6 +88,7 @@ const INITIAL_UI_STATE: UIState = {
     itczInfluenceBand: true,
     windVectors: false,    // Step 2 卓越風（既定 OFF: Step 4 final wind を既定で表示）
     oceanCurrents: true,
+    oceanStreamlines: true,
     seaIce: true,
     finalWindVectors: true,  // Step 4 final wind（既定 ON）
     pressureAnomaly: false,  // 圧力 anomaly ヒートマップ（既定 OFF、利用者が必要時に ON）

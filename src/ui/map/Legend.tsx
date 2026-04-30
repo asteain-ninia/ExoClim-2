@@ -69,6 +69,21 @@ export function Legend() {
           <label>
             <input
               type="checkbox"
+              checked={legendVisibility.oceanStreamlines}
+              onChange={(e) =>
+                setLegendVisibility({ oceanStreamlines: e.target.checked })
+              }
+              data-testid="legend-ocean-streamlines"
+            />
+            <span className="legend-swatch legend-swatch--stream-warm" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--stream-cold" aria-hidden="true" />
+            海流ストリームライン（Step 3、流線）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
               checked={legendVisibility.seaIce}
               onChange={(e) => setLegendVisibility({ seaIce: e.target.checked })}
               data-testid="legend-sea-ice"

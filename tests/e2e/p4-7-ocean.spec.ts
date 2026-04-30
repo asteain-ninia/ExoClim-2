@@ -114,4 +114,17 @@ test.describe('P4-7: Step 3 海流', () => {
     await expect(page.getByTestId('slider-ocean-cold-drop')).toHaveValue('10');
     await expect(page.getByTestId('slider-ocean-sea-ice-lat')).toHaveValue('70');
   });
+
+  test('海流ストリームライン トグルが表示され、既定 ON、OFF にすると描画が変わる', async ({
+    page,
+  }) => {
+    // 表示トグルにストリームライン項目が追加されている（[docs/spec/03_海流.md §4.1〜§4.5]）
+    await expect(page.getByTestId('legend-ocean-streamlines')).toBeVisible();
+    await expect(page.getByTestId('legend-ocean-streamlines')).toBeChecked();
+    const before = await canvasFingerprint(page);
+    await page.getByTestId('legend-ocean-streamlines').uncheck();
+    await page.waitForTimeout(150);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
 });

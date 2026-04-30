@@ -83,7 +83,8 @@ test.describe('P4-9: Step 5 気温', () => {
   test('等温線 刻み幅を変えると Canvas 描画が変わる（10 → 5 で線数増加）', async ({ page }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-temperature-isotherm-interval', '5');
-    await page.waitForTimeout(900);
+    // Step 7 + 海流ストリームライン追加で再計算時間が伸びたため 1300ms に延長（[開発ガイド.md §6.2.1]）
+    await page.waitForTimeout(1300);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });
