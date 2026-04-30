@@ -4,6 +4,7 @@ import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  DEFAULT_PRECIPITATION_STEP_PARAMS,
   DEFAULT_TEMPERATURE_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
 } from '@/sim';
@@ -21,6 +22,7 @@ const baseInputs = (): PipelineInputs => ({
   oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
   temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
+  precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
 });
 
 describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ骨格）', () => {
@@ -63,6 +65,7 @@ describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ�
         oceanCurrentParams: { ...inputs1.oceanCurrentParams },
         airflowParams: { ...inputs1.airflowParams },
         temperatureParams: { ...inputs1.temperatureParams },
+        precipitationParams: { ...inputs1.precipitationParams },
       };
       const second = runPipeline(inputs2, first.cache);
       expect(second.output.cacheHits.itcz).toBe(true);

@@ -20,6 +20,8 @@ import type {
   IsothermLine,
   ITCZResult,
   OceanCurrentResult,
+  PrecipitationLabel,
+  PrecipitationResult,
   PressureCenter,
   TemperatureResult,
   WindVector,
@@ -508,6 +510,94 @@ function buildTemperatureBitmap(
   return off;
 }
 
+/**
+ * 降水ラベル overlay の表示色（[docs/spec/06_降水.md §4]）。
+ *   dry: 黄系（乾燥砂漠の連想）
+ *   wet: 水色（湿潤の連想）
+ *   very_wet: 濃い青（多湿の連想）
+ *   normal: 透明（地形を阻害しない）
+ */
+const PRECIPITATION_LABEL_COLORS: Readonly<Record<PrecipitationLabel, RGB | null>> = {
+  dry: { r: 220, g: 180, b: 90 },
+  normal: null,
+  wet: { r: 70, g: 160, b: 220 },
+  very_wet: { r: 40, g: 90, b: 180 },
+};
+
+/** 降水ラベル overlay の最大不透明度（255 中、地形が透けて見える程度）。 */
+const PRECIPITATION_LABEL_ALPHA = 130;
+
+/**
+ * 降水ラベル overlay ビットマップを構築する（[docs/spec/06_降水.md §5]）。
+ *
+ * 月別表示なら指定月の `monthlyPrecipitationLabels`、年平均なら 12 ヶ月分から
+ * セル毎の最頻ラベルを採用する。海洋セルは透明（陸の湿度ラベル可視化のみ）。
+ */
+function buildPrecipitationBitmap(
+  precipitation: PrecipitationResult,
+  monthIndex: number | null,
+  grid: Grid,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const monthsArr = precipitation.monthlyPrecipitationLabels;
+  const getLabel = (i: number, j: number): PrecipitationLabel => {
+    if (monthIndex !== null) {
+      return monthsArr[monthIndex]?.[i]?.[j] ?? 'normal';
+    }
+    // 年平均: 12 ヶ月の最頻ラベル
+    const counts: Record<PrecipitationLabel, number> = {
+      dry: 0,
+      normal: 0,
+      wet: 0,
+      very_wet: 0,
+    };
+    for (const month of monthsArr) {
+      const v = month[i]?.[j] ?? 'normal';
+      counts[v]++;
+    }
+    let best: PrecipitationLabel = 'normal';
+    let bestCount = -1;
+    (Object.keys(counts) as PrecipitationLabel[]).forEach((k) => {
+      if (counts[k] > bestCount) {
+        best = k;
+        bestCount = counts[k];
+      }
+    });
+    return best;
+  };
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const cellRow = grid.cells[r];
+    if (!cellRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const cell = cellRow[c];
+      if (!cell || !cell.isLand) continue; // 陸地のみ描画
+      const label = getLabel(r, c);
+      const color = PRECIPITATION_LABEL_COLORS[label];
+      if (!color) continue; // normal は透明
+      const offset = (imageY * cols + c) * 4;
+      data[offset] = color.r;
+      data[offset + 1] = color.g;
+      data[offset + 2] = color.b;
+      data[offset + 3] = PRECIPITATION_LABEL_ALPHA;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
 /** 海氷の表示用フェード幅（°）。しきい値の前後 SEA_ICE_FADE_WIDTH_DEG で α を線形補間する。 */
 const SEA_ICE_FADE_WIDTH_DEG = 5;
 /** 海氷の最大不透明度（α 1 のときの最終 alpha 値、255 中）。 */
@@ -853,6 +943,7 @@ function drawMap(
   seaIceBitmap: HTMLCanvasElement | null,
   pressureAnomalyBitmap: HTMLCanvasElement | null,
   temperatureBitmap: HTMLCanvasElement | null,
+  precipitationBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
@@ -883,6 +974,10 @@ function drawMap(
   // 気温ヒートマップ（陸海の上、半透明で地形が透けて見える）
   if (legendVisibility.temperatureHeatmap && temperatureBitmap) {
     drawOverlayBitmap(ctx, temperatureBitmap, norm);
+  }
+  // 降水ラベル overlay（陸地のみ、半透明）
+  if (legendVisibility.precipitationLabels && precipitationBitmap) {
+    drawOverlayBitmap(ctx, precipitationBitmap, norm);
   }
   // 海氷は最後に陸海の上にかぶせる（白で覆う）。
   if (legendVisibility.seaIce && seaIceBitmap) {
@@ -925,6 +1020,7 @@ export function MapCanvas() {
   const oceanCurrent = useResultsStore((s) => s.oceanCurrent);
   const airflow = useResultsStore((s) => s.airflow);
   const temperature = useResultsStore((s) => s.temperature);
+  const precipitation = useResultsStore((s) => s.precipitation);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
@@ -970,6 +1066,13 @@ export function MapCanvas() {
     const monthIndex = currentSeason === 'annual' ? null : currentSeason;
     return buildTemperatureBitmap(temperature, monthIndex, grid);
   }, [temperature, currentSeason, grid]);
+
+  // 降水ラベル overlay ビットマップ（precipitation + currentSeason 依存）
+  const precipitationBitmap = useMemo(() => {
+    if (!precipitation || !grid) return null;
+    const monthIndex = currentSeason === 'annual' ? null : currentSeason;
+    return buildPrecipitationBitmap(precipitation, monthIndex, grid);
+  }, [precipitation, currentSeason, grid]);
 
   // 等温線（temperature + currentSeason 依存）
   const isothermsForSeason = useMemo<ReadonlyArray<IsothermLine> | null>(() => {
@@ -1106,6 +1209,7 @@ export function MapCanvas() {
       seaIceBitmap,
       pressureAnomalyBitmap,
       temperatureBitmap,
+      precipitationBitmap,
       influenceBandBitmap,
       bands,
       windField,
@@ -1122,6 +1226,7 @@ export function MapCanvas() {
     seaIceBitmap,
     pressureAnomalyBitmap,
     temperatureBitmap,
+    precipitationBitmap,
     influenceBandBitmap,
     bands,
     windField,

@@ -16,6 +16,7 @@ export {
   OceanCurrentStepParamsSliders,
   OrbitalSliders,
   PlanetBodySliders,
+  PrecipitationStepParamsSliders,
   Slider,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,

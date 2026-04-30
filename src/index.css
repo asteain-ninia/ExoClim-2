@@ -246,6 +246,24 @@ body {
   background: #b0d0e0;
 }
 
+.legend-swatch--precip-dry {
+  background: rgba(220, 180, 90, 0.55);
+  border-color: #d8a850;
+  width: 12px;
+}
+
+.legend-swatch--precip-wet {
+  background: rgba(70, 160, 220, 0.55);
+  border-color: #4090e0;
+  width: 12px;
+}
+
+.legend-swatch--precip-verywet {
+  background: rgba(40, 90, 180, 0.65);
+  border-color: #2860c0;
+  width: 12px;
+}
+
 .legend-swatch--wind::before {
   content: '→';
   position: absolute;

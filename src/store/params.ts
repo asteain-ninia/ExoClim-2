@@ -19,11 +19,13 @@ import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  DEFAULT_PRECIPITATION_STEP_PARAMS,
   DEFAULT_TEMPERATURE_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
   type AirflowStepParams,
   type ITCZStepParams,
   type OceanCurrentStepParams,
+  type PrecipitationStepParams,
   type TemperatureStepParams,
   type WindBeltStepParams,
 } from '@/sim';
@@ -48,6 +50,7 @@ export interface ParamsState {
   readonly oceanCurrentParams: OceanCurrentStepParams;
   readonly airflowParams: AirflowStepParams;
   readonly temperatureParams: TemperatureStepParams;
+  readonly precipitationParams: PrecipitationStepParams;
 }
 
 export interface ParamsActions {
@@ -69,6 +72,8 @@ export interface ParamsActions {
   readonly setAirflowParams: (patch: Partial<AirflowStepParams>) => void;
   /** Step 5 気温パラメータを部分更新する。 */
   readonly setTemperatureParams: (patch: Partial<TemperatureStepParams>) => void;
+  /** Step 6 降水パラメータを部分更新する。 */
+  readonly setPrecipitationParams: (patch: Partial<PrecipitationStepParams>) => void;
   /** 初期値（地球プリセット + デフォルト Step パラメータ）に戻す。 */
   readonly reset: () => void;
 }
@@ -82,6 +87,7 @@ const INITIAL_PARAMS_STATE: ParamsState = {
   oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
   temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
+  precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
 };
 
 /**
@@ -118,6 +124,8 @@ export const createParamsStore = () =>
       set((state) => ({ airflowParams: { ...state.airflowParams, ...patch } })),
     setTemperatureParams: (patch) =>
       set((state) => ({ temperatureParams: { ...state.temperatureParams, ...patch } })),
+    setPrecipitationParams: (patch) =>
+      set((state) => ({ precipitationParams: { ...state.precipitationParams, ...patch } })),
     reset: () => set(INITIAL_PARAMS_STATE),
   }));
 

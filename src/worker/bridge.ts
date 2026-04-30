@@ -12,6 +12,7 @@ import type {
   AirflowStepParams,
   ITCZStepParams,
   OceanCurrentStepParams,
+  PrecipitationStepParams,
   TemperatureStepParams,
   WindBeltStepParams,
 } from '@/sim';
@@ -75,6 +76,7 @@ interface WorkerRunRequest {
   readonly oceanCurrentParams: OceanCurrentStepParams;
   readonly airflowParams: AirflowStepParams;
   readonly temperatureParams: TemperatureStepParams;
+  readonly precipitationParams: PrecipitationStepParams;
 }
 
 export type WorkerInboundMessage = WorkerGridUpdateRequest | WorkerRunRequest;
@@ -135,6 +137,7 @@ export function createWorkerPipelineBridge(): PipelineBridge {
           oceanCurrentParams: inputs.oceanCurrentParams,
           airflowParams: inputs.airflowParams,
           temperatureParams: inputs.temperatureParams,
+          precipitationParams: inputs.precipitationParams,
         };
         worker.postMessage(runMessage);
       });

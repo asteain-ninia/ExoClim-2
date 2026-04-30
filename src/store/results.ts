@@ -2,8 +2,8 @@
 // 仕様: [要件定義書.md §5.4] / [技術方針.md §2.1.4]。
 // 規約: ワーカー層が PipelineOutput を更新で渡し、本 store は受信専用。
 //
-// 現状（P4-9）は Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温を連結。
-// Step 6〜7 の結果が増えるたびに本型を拡張する。
+// 現状（P4-10）は Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温 + Step 6 降水を連結。
+// Step 7 の結果が増えたら本型を拡張する。
 
 import { create } from 'zustand';
 import type {
@@ -11,6 +11,7 @@ import type {
   Grid,
   ITCZResult,
   OceanCurrentResult,
+  PrecipitationResult,
   TemperatureResult,
   WindBeltResult,
 } from '@/domain';
@@ -27,6 +28,8 @@ export interface ResultsState {
   readonly airflow: AirflowResult | null;
   /** Step 5 気温の結果。未計算なら null。 */
   readonly temperature: TemperatureResult | null;
+  /** Step 6 降水の結果。未計算なら null。 */
+  readonly precipitation: PrecipitationResult | null;
   /**
    * 直近 pipeline 実行で使われた Grid（地形含む）。UI 層が陸地・標高描画で参照する。
    * 未計算なら null。
@@ -39,6 +42,7 @@ export interface ResultsState {
     readonly oceanCurrent: boolean;
     readonly airflow: boolean;
     readonly temperature: boolean;
+    readonly precipitation: boolean;
   };
 }
 
@@ -59,6 +63,7 @@ const INITIAL_RESULTS_STATE: ResultsState = {
   oceanCurrent: null,
   airflow: null,
   temperature: null,
+  precipitation: null,
   grid: null,
   cacheHits: {
     itcz: false,
@@ -66,6 +71,7 @@ const INITIAL_RESULTS_STATE: ResultsState = {
     oceanCurrent: false,
     airflow: false,
     temperature: false,
+    precipitation: false,
   },
 };
 
@@ -79,12 +85,14 @@ export const createResultsStore = () =>
         oceanCurrent: output.oceanCurrent,
         airflow: output.airflow,
         temperature: output.temperature,
+        precipitation: output.precipitation,
         cacheHits: {
           itcz: output.cacheHits.itcz,
           windBelt: output.cacheHits.windBelt,
           oceanCurrent: output.cacheHits.oceanCurrent,
           airflow: output.cacheHits.airflow,
           temperature: output.cacheHits.temperature,
+          precipitation: output.cacheHits.precipitation,
         },
       }),
     setGrid: (grid) => set({ grid }),

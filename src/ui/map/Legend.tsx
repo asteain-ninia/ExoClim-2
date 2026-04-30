@@ -139,6 +139,22 @@ export function Legend() {
             等温線（Step 5、刻み °C）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.precipitationLabels}
+              onChange={(e) =>
+                setLegendVisibility({ precipitationLabels: e.target.checked })
+              }
+              data-testid="legend-precipitation"
+            />
+            <span className="legend-swatch legend-swatch--precip-dry" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--precip-wet" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--precip-verywet" aria-hidden="true" />
+            降水（Step 6、乾/湿/多湿）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

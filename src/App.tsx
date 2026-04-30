@@ -17,6 +17,7 @@ import {
   OceanCurrentStepParamsSliders,
   OrbitalSliders,
   PlanetBodySliders,
+  PrecipitationStepParamsSliders,
   SeasonSelector,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,
@@ -56,6 +57,7 @@ export function App() {
           <OceanCurrentStepParamsSliders />
           <AirflowStepParamsSliders />
           <TemperatureStepParamsSliders />
+          <PrecipitationStepParamsSliders />
         </section>
       </main>
     </div>
