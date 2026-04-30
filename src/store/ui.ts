@@ -49,10 +49,21 @@ export interface LegendVisibility {
   readonly climateZones: boolean;
 }
 
+/**
+ * マウスオーバー中のセル位置（grid index ベース、[要件定義書.md §2.3.5] デバッグビュー簡易版）。
+ * MapCanvas が pointermove ハンドラから設定し、CellInspector が購読する。
+ */
+export interface HoveredCell {
+  readonly latIndex: number;
+  readonly lonIndex: number;
+}
+
 export interface UIState {
   readonly currentStep: CurrentStepView;
   readonly currentSeason: SeasonPhaseView;
   readonly legendVisibility: LegendVisibility;
+  /** マウスオーバー中のセル。マップ外なら null。 */
+  readonly hoveredCell: HoveredCell | null;
 }
 
 export interface UIActions {
@@ -60,6 +71,8 @@ export interface UIActions {
   readonly setCurrentSeason: (season: SeasonPhaseView) => void;
   /** 凡例フラグを部分更新する。 */
   readonly setLegendVisibility: (patch: Partial<LegendVisibility>) => void;
+  /** マウスオーバー中のセルを設定（マップ外で null）。 */
+  readonly setHoveredCell: (cell: HoveredCell | null) => void;
   readonly reset: () => void;
 }
 
@@ -82,6 +95,7 @@ const INITIAL_UI_STATE: UIState = {
     precipitationLabels: false, // 降水ラベル overlay（既定 OFF、地形が見えなくなるため）
     climateZones: false,        // 気候帯 overlay（既定 OFF、地形が見えなくなるため）
   },
+  hoveredCell: null,
 };
 
 export const createUIStore = () =>
@@ -93,6 +107,7 @@ export const createUIStore = () =>
       set((state) => ({
         legendVisibility: { ...state.legendVisibility, ...patch },
       })),
+    setHoveredCell: (cell) => set({ hoveredCell: cell }),
     reset: () => set(INITIAL_UI_STATE),
   }));
 

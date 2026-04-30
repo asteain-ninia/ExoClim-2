@@ -14,7 +14,7 @@ export function Legend() {
 
   return (
     <fieldset className="param-group legend-panel" data-testid="legend-panel">
-      <legend>凡例</legend>
+      <legend>表示トグル</legend>
       <ul className="legend-panel__list">
         <li>
           <label>
@@ -174,6 +174,7 @@ export function Legend() {
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。
+        マウスオーバーで「セル情報」パネルに詳細表示。
       </p>
     </fieldset>
   );

@@ -43,16 +43,28 @@ describe('store/ui: UI 状態 store', () => {
     });
   });
 
+  describe('setHoveredCell', () => {
+    it('hoveredCell を設定・解除できる', () => {
+      expect(store.getState().hoveredCell).toBeNull();
+      store.getState().setHoveredCell({ latIndex: 30, lonIndex: 60 });
+      expect(store.getState().hoveredCell).toEqual({ latIndex: 30, lonIndex: 60 });
+      store.getState().setHoveredCell(null);
+      expect(store.getState().hoveredCell).toBeNull();
+    });
+  });
+
   describe('reset', () => {
-    it('reset で初期状態に戻る', () => {
+    it('reset で初期状態に戻る（hoveredCell を含む）', () => {
       store.getState().setCurrentStep('precipitation');
       store.getState().setCurrentSeason(3);
       store.getState().setLegendVisibility({ itczCenterLine: false });
+      store.getState().setHoveredCell({ latIndex: 10, lonIndex: 20 });
       store.getState().reset();
       const s = store.getState();
       expect(s.currentStep).toBe('itcz');
       expect(s.currentSeason).toBe('annual');
       expect(s.legendVisibility.itczCenterLine).toBe(true);
+      expect(s.hoveredCell).toBeNull();
     });
   });
 });

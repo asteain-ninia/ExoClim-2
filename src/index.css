@@ -461,3 +461,33 @@ body {
   font-size: 0.78rem;
   line-height: 1.4;
 }
+
+/* セル情報パネル（マウスオーバー時の詳細表示） */
+
+.cell-inspector__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  row-gap: 4px;
+  margin: 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-inspector__list dt {
+  color: #8aa0b8;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cell-inspector__list dd {
+  margin: 0;
+  color: #d8e6f4;
+  word-break: break-word;
+}
+
+.cell-inspector__empty {
+  margin: 4px 0 0;
+  color: #8aa0b8;
+  font-size: 0.85rem;
+}

@@ -37,6 +37,7 @@ import {
 import {
   normalizePanOffsetPx,
   projectRaw,
+  unprojectRaw,
   type CanvasViewport,
 } from './projections';
 
@@ -1121,6 +1122,7 @@ export function MapCanvas() {
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
+  const setHoveredCell = useUIStore((s) => s.setHoveredCell);
   const baseInfluenceHalfWidthDeg = useParamsStore(
     (s) => s.itczParams.baseInfluenceHalfWidthDeg,
   );
@@ -1285,12 +1287,41 @@ export function MapCanvas() {
     [panOffsetPx],
   );
 
-  const handlePointerMove = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const dx = e.clientX - drag.startClientX;
-    setPanOffsetPx(drag.startOffset + dx);
-  }, []);
+  const handlePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLCanvasElement>) => {
+      const drag = dragRef.current;
+      if (drag) {
+        const dx = e.clientX - drag.startClientX;
+        setPanOffsetPx(drag.startOffset + dx);
+        return;
+      }
+      // Hover 位置 → grid index 解決（pan を含めて逆投影）
+      if (!grid) return;
+      const canvas = e.currentTarget;
+      const rect = canvas.getBoundingClientRect();
+      // CSS サイズと canvas の論理サイズが異なる場合のスケーリング補正
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const xCanvasPx = (e.clientX - rect.left) * scaleX;
+      const yCanvasPx = (e.clientY - rect.top) * scaleY;
+      const norm = normalizePanOffsetPx(panOffsetPx, VIEWPORT);
+      const { latitudeDeg, longitudeDeg } = unprojectRaw(xCanvasPx, yCanvasPx, VIEWPORT, norm);
+      // grid の lat/lon → index
+      const i = Math.floor((latitudeDeg + 90) / grid.resolutionDeg);
+      const j = Math.floor((longitudeDeg + 180) / grid.resolutionDeg);
+      if (
+        i >= 0 &&
+        i < grid.latitudeCount &&
+        j >= 0 &&
+        j < grid.longitudeCount
+      ) {
+        setHoveredCell({ latIndex: i, lonIndex: j });
+      } else {
+        setHoveredCell(null);
+      }
+    },
+    [grid, panOffsetPx, setHoveredCell],
+  );
 
   const handlePointerUp = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -1298,6 +1329,10 @@ export function MapCanvas() {
     }
     dragRef.current = null;
   }, []);
+
+  const handlePointerLeave = useCallback(() => {
+    setHoveredCell(null);
+  }, [setHoveredCell]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1363,6 +1398,7 @@ export function MapCanvas() {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
     />
   );
 }

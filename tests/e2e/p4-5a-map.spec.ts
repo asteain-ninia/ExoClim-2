@@ -52,9 +52,10 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
     expect(box?.height).toBe(630);
   });
 
-  test('凡例が常時表示される（[要件定義書.md §2.3.2]）', async ({ page }) => {
+  test('表示トグルパネルが常時表示される（[要件定義書.md §2.3.2]）', async ({ page }) => {
     // fieldset / legend パターンに統一したため role は 'group'（legend が accessible name）
-    await expect(page.getByRole('group', { name: '凡例' })).toBeVisible();
+    // P4-12 で「凡例」→「表示トグル」に名称変更（実態がトグル UI のため）
+    await expect(page.getByRole('group', { name: '表示トグル' })).toBeVisible();
     await expect(page.getByTestId('legend-itcz-center')).toBeChecked();
     await expect(page.getByTestId('legend-itcz-band')).toBeChecked();
   });

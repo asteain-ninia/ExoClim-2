@@ -11,6 +11,7 @@ import {
 import {
   AirflowStepParamsSliders,
   AtmosphereOceanSliders,
+  CellInspector,
   ClimateZoneStepParamsSliders,
   ITCZStepParamsSliders,
   Legend,
@@ -49,6 +50,7 @@ export function App() {
         </section>
         <section className="controls-section">
           <Legend />
+          <CellInspector />
           <OrbitalSliders />
           <PlanetBodySliders />
           <AtmosphereOceanSliders />

@@ -4,6 +4,7 @@
 export {
   CANVAS_HEIGHT_PX,
   CANVAS_WIDTH_PX,
+  CellInspector,
   Legend,
   MapCanvas,
   SeasonSelector,
