@@ -114,6 +114,31 @@ export function Legend() {
             気圧中心（Step 4、H / L マーカー）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.temperatureHeatmap}
+              onChange={(e) => setLegendVisibility({ temperatureHeatmap: e.target.checked })}
+              data-testid="legend-temperature"
+            />
+            <span className="legend-swatch legend-swatch--temperature-cold" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--temperature-hot" aria-hidden="true" />
+            気温（Step 5、青寒〜赤暑）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.isotherms}
+              onChange={(e) => setLegendVisibility({ isotherms: e.target.checked })}
+              data-testid="legend-isotherms"
+            />
+            <span className="legend-swatch legend-swatch--isotherm" aria-hidden="true" />
+            等温線（Step 5、刻み °C）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

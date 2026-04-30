@@ -127,6 +127,20 @@ export interface AirflowResult {
 // Step 5: 気温 ([docs/spec/05_気温.md] §5)
 // ============================================================
 
+/** 等温線の 1 セグメント（2 点を結ぶ線分）。緯度経度座標。 */
+export interface IsothermSegment {
+  readonly start: GeoPoint;
+  readonly end: GeoPoint;
+}
+
+/** ある等値温度に対応する等温線セット（複数セグメントの集合）。 */
+export interface IsothermLine {
+  /** 対応する等値温度（°C）。 */
+  readonly temperatureCelsius: number;
+  /** セグメント列。経度方向の wraparound（180°越え）はセグメントの分断で表現する。 */
+  readonly segments: ReadonlyArray<IsothermSegment>;
+}
+
 export interface TemperatureResult {
   /** 月別地表気温マップ（°C）。 */
   readonly monthlyTemperatureCelsius: Months12<GridMap<number>>;
@@ -147,6 +161,13 @@ export interface TemperatureResult {
    * [docs/spec/05_気温.md §4.10.4]。Step 7 で判定経路を切替える根拠となる。
    */
   readonly polarInversion: boolean;
+  /**
+   * 月別の等温線セット（[docs/spec/05_気温.md §4.12]）。各月ごとに刻み幅で並ぶ
+   * 等値温度のラインリスト。表示用の派生量で、後続 Step は消費しない。
+   */
+  readonly monthlyIsotherms: Months12<ReadonlyArray<IsothermLine>>;
+  /** 年平均気温の等温線セット（[§4.12]）。 */
+  readonly annualIsotherms: ReadonlyArray<IsothermLine>;
 }
 
 // ============================================================

@@ -54,7 +54,8 @@ test.describe('P4-8: Step 4 気流', () => {
       },
       { timeout: 10_000 },
     );
-    await page.waitForTimeout(200);
+    // Step 5 (P4-9) を pipeline に追加して初期計算が長くなったため十分な待機を取る。
+    await page.waitForTimeout(900);
   });
 
   test('Step 4 気流パネル（4 スライダー）が表示される', async ({ page }) => {
@@ -89,7 +90,7 @@ test.describe('P4-8: Step 4 気流', () => {
   }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-airflow-pressure-gradient', '0');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });
@@ -116,7 +117,7 @@ test.describe('P4-8: Step 4 気流', () => {
   }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-airflow-monsoon-reversal', '0');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });

@@ -17,6 +17,7 @@ export {
   OrbitalSliders,
   PlanetBodySliders,
   Slider,
+  TemperatureStepParamsSliders,
   TerrainSourceSelector,
   WindBeltStepParamsSliders,
 } from './parameters';

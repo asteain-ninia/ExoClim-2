@@ -45,6 +45,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => 
       windBeltParams: message.windBeltParams,
       oceanCurrentParams: message.oceanCurrentParams,
       airflowParams: message.airflowParams,
+      temperatureParams: message.temperatureParams,
     };
     const result = runPipeline(inputs, cache);
     cache = result.cache;

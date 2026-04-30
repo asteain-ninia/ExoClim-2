@@ -44,12 +44,12 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
     );
   });
 
-  test('Canvas が固定サイズ（960x480）で表示される（[要件定義書.md §2.3.1]）', async ({ page }) => {
+  test('Canvas が固定サイズ（1260x630）で表示される（[要件定義書.md §2.3.1]）', async ({ page }) => {
     const canvas = page.locator('[data-testid="map-canvas"]');
     await expect(canvas).toBeVisible();
     const box = await canvas.boundingBox();
-    expect(box?.width).toBe(960);
-    expect(box?.height).toBe(480);
+    expect(box?.width).toBe(1260);
+    expect(box?.height).toBe(630);
   });
 
   test('凡例が常時表示される（[要件定義書.md §2.3.2]）', async ({ page }) => {
@@ -117,11 +117,11 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
 
-    // 1.5 周分（1440 px）ドラッグ → 完全 1 周（960 px）+ 480 px の状態と等価
+    // 1.5 周分（1890 px）ドラッグ → 完全 1 周（1260 px）+ 630 px の状態と等価
     await page.mouse.move(cx, cy);
     await page.mouse.down();
     // Playwright の steps は 1 ステップあたりの移動上限が無いが、ステップ数を増やしてキャプチャ精度を確保
-    await page.mouse.move(cx - 1440, cy, { steps: 30 });
+    await page.mouse.move(cx - 1890, cy, { steps: 30 });
     await page.mouse.up();
     await page.waitForTimeout(100);
 

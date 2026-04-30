@@ -51,7 +51,8 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
       const px = ctx.getImageData(c.width / 2, c.height / 2, 1, 1).data;
       return (px[0] ?? 0) > 0 || (px[1] ?? 0) > 0 || (px[2] ?? 0) > 0;
     });
-    await page.waitForTimeout(150);
+    // Step 5 (P4-9) を pipeline に追加して初期計算が長くなったため十分な待機を取る。
+    await page.waitForTimeout(900);
   });
 
   test('AtmosphereOceanParams 9 スライダーがすべて表示される', async ({ page }) => {
@@ -123,7 +124,7 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
     const before = await canvasFingerprint(page);
     // 既定 15° → 5° に縮める。中心線は変わらず帯のみ細くなる
     await setRangeValue(page, 'slider-itcz-half-width', '5');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });
@@ -133,7 +134,8 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
   }) => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-itcz-monsoon-pull', '0');
-    await page.waitForTimeout(500);
+    // Step 5 (P4-9) を pipeline に追加した影響で再計算が長くなっているため、十分な時間を待つ。
+    await page.waitForTimeout(1500);
     const after = await canvasFingerprint(page);
     // 地球地形では landFraction の差で年平均線が陸海バランスに引き寄せられている。
     // 0 にすると一様に赤道の直線に戻るので描画が変わる。

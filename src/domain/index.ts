@@ -44,6 +44,8 @@ export type {
   CollisionPointType,
   CurrentClassification,
   CurrentStreamline,
+  IsothermLine,
+  IsothermSegment,
   ITCZBand,
   ITCZResult,
   OceanCurrentResult,

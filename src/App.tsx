@@ -18,6 +18,7 @@ import {
   OrbitalSliders,
   PlanetBodySliders,
   SeasonSelector,
+  TemperatureStepParamsSliders,
   TerrainSourceSelector,
   WindBeltStepParamsSliders,
 } from '@/ui';
@@ -54,6 +55,7 @@ export function App() {
           <WindBeltStepParamsSliders />
           <OceanCurrentStepParamsSliders />
           <AirflowStepParamsSliders />
+          <TemperatureStepParamsSliders />
         </section>
       </main>
     </div>

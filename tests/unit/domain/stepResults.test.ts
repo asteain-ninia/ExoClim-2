@@ -173,9 +173,12 @@ describe('domain/stepResults: Step 結果型と SimulationResult', () => {
         monthlyEvapotranspirationMmPerMonth: months12(numGrid),
         seasonalAmplitudeCelsius: numGrid,
         polarInversion: false,
+        monthlyIsotherms: months12([]),
+        annualIsotherms: [],
       };
       expect(result.polarInversion).toBe(false);
       expect(result.monthlyTemperatureCelsius.length).toBe(12);
+      expect(result.annualIsotherms.length).toBe(0);
     });
   });
 
@@ -318,6 +321,8 @@ describe('domain/stepResults: Step 結果型と SimulationResult', () => {
           monthlyEvapotranspirationMmPerMonth: months12(numGrid),
           seasonalAmplitudeCelsius: numGrid,
           polarInversion: false,
+          monthlyIsotherms: months12([]),
+          annualIsotherms: [],
         },
         precipitation: {
           monthlyPrecipitationLabels: months12<GridMap<PrecipitationLabel>>(

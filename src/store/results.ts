@@ -2,7 +2,8 @@
 // 仕様: [要件定義書.md §5.4] / [技術方針.md §2.1.4]。
 // 規約: ワーカー層が PipelineOutput を更新で渡し、本 store は受信専用。
 //
-// 現状（P4-3 / P4-4）は Step 1 ITCZ のみ連結。Step 2〜7 の結果が増えるたびに本型を拡張する。
+// 現状（P4-9）は Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温を連結。
+// Step 6〜7 の結果が増えるたびに本型を拡張する。
 
 import { create } from 'zustand';
 import type {
@@ -10,6 +11,7 @@ import type {
   Grid,
   ITCZResult,
   OceanCurrentResult,
+  TemperatureResult,
   WindBeltResult,
 } from '@/domain';
 import type { PipelineOutput } from '@/worker/pipeline';
@@ -23,6 +25,8 @@ export interface ResultsState {
   readonly oceanCurrent: OceanCurrentResult | null;
   /** Step 4 気流の結果。未計算なら null。 */
   readonly airflow: AirflowResult | null;
+  /** Step 5 気温の結果。未計算なら null。 */
+  readonly temperature: TemperatureResult | null;
   /**
    * 直近 pipeline 実行で使われた Grid（地形含む）。UI 層が陸地・標高描画で参照する。
    * 未計算なら null。
@@ -34,6 +38,7 @@ export interface ResultsState {
     readonly windBelt: boolean;
     readonly oceanCurrent: boolean;
     readonly airflow: boolean;
+    readonly temperature: boolean;
   };
 }
 
@@ -53,8 +58,15 @@ const INITIAL_RESULTS_STATE: ResultsState = {
   windBelt: null,
   oceanCurrent: null,
   airflow: null,
+  temperature: null,
   grid: null,
-  cacheHits: { itcz: false, windBelt: false, oceanCurrent: false, airflow: false },
+  cacheHits: {
+    itcz: false,
+    windBelt: false,
+    oceanCurrent: false,
+    airflow: false,
+    temperature: false,
+  },
 };
 
 export const createResultsStore = () =>
@@ -66,11 +78,13 @@ export const createResultsStore = () =>
         windBelt: output.windBelt,
         oceanCurrent: output.oceanCurrent,
         airflow: output.airflow,
+        temperature: output.temperature,
         cacheHits: {
           itcz: output.cacheHits.itcz,
           windBelt: output.cacheHits.windBelt,
           oceanCurrent: output.cacheHits.oceanCurrent,
           airflow: output.cacheHits.airflow,
+          temperature: output.cacheHits.temperature,
         },
       }),
     setGrid: (grid) => set({ grid }),

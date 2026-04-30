@@ -22,7 +22,7 @@ export type SeasonPhaseView = 'annual' | number;
 
 /**
  * 凡例・補助線の表示／非表示フラグ集合（[要件定義書.md §2.3.2]）。
- * Step 1〜4 連結。Step 5〜7 連結時に項目を追加する。
+ * Step 1〜5 連結。Step 6〜7 連結時に項目を追加する。
  */
 export interface LegendVisibility {
   readonly itczCenterLine: boolean;
@@ -39,6 +39,10 @@ export interface LegendVisibility {
   readonly pressureAnomaly: boolean;
   /** Step 4 気流の気圧中心マーカー（H / L）表示トグル。 */
   readonly pressureCenters: boolean;
+  /** Step 5 気温のヒートマップ overlay 表示トグル（青→赤）。 */
+  readonly temperatureHeatmap: boolean;
+  /** Step 5 気温の等温線 overlay 表示トグル（[docs/spec/05_気温.md §4.12]）。 */
+  readonly isotherms: boolean;
 }
 
 export interface UIState {
@@ -69,6 +73,8 @@ const INITIAL_UI_STATE: UIState = {
     finalWindVectors: true,  // Step 4 final wind（既定 ON）
     pressureAnomaly: false,  // 圧力 anomaly ヒートマップ（既定 OFF、利用者が必要時に ON）
     pressureCenters: true,   // 気圧中心 H / L マーカー（既定 ON、地形と相関した anomaly 中心を直感化）
+    temperatureHeatmap: false, // 気温ヒートマップ（既定 OFF、地形が見えなくなるため）
+    isotherms: true,           // 等温線（既定 ON、地形を阻害せず温度勾配を読み取れる）
   },
 };
 

@@ -17,9 +17,11 @@ import type {
   Cell,
   Grid,
   GridMap,
+  IsothermLine,
   ITCZResult,
   OceanCurrentResult,
   PressureCenter,
+  TemperatureResult,
   WindVector,
 } from '@/domain';
 import { useParamsStore } from '@/store/params';
@@ -35,9 +37,13 @@ import {
   type CanvasViewport,
 } from './projections';
 
-/** Canvas 固定サイズ（Equirectangular 2:1 比、1° / 1px の素直な対応）。 */
-export const CANVAS_WIDTH_PX = 960;
-export const CANVAS_HEIGHT_PX = 480;
+/**
+ * Canvas 固定サイズ（Equirectangular 2:1 比、1° = 3.5 px の拡大表示）。
+ * 1° = 1px は情報密度が低かったため、1° = 3.5px に拡大して読みやすくする。
+ * 2:1 比は世界地図の標準的な縦横比（[要件定義書.md §2.3.1]）。
+ */
+export const CANVAS_WIDTH_PX = 1260;
+export const CANVAS_HEIGHT_PX = 630;
 
 const VIEWPORT: CanvasViewport = {
   widthPx: CANVAS_WIDTH_PX,
@@ -425,6 +431,83 @@ function buildPressureAnomalyBitmap(
   return off;
 }
 
+/**
+ * 気温ヒートマップの表示レンジ（°C）。`TEMPERATURE_COLD_CELSIUS` 以下を最も冷たい色、
+ * `TEMPERATURE_HOT_CELSIUS` 以上を最も暖かい色にし、間は線形補間する。
+ * 旧 ExoClim と同じく地球の Köppen 帯境界（-30 / +30）に揃えた。
+ */
+const TEMPERATURE_COLD_CELSIUS = -30;
+const TEMPERATURE_HOT_CELSIUS = 30;
+/** 気温ヒートマップの最大不透明度（255 中、地形が透けて見える程度）。 */
+const TEMPERATURE_HEATMAP_ALPHA = 165;
+
+/**
+ * 気温ヒートマップビットマップを構築する。
+ *
+ * 月別表示なら指定月の `monthlyTemperatureCelsius`、年平均なら `annualMeanTemperatureCelsius`
+ * を読み、温度を青→白→赤の 3 色グラデーションに変換する。
+ * 値が `TEMPERATURE_COLD_CELSIUS` 以下なら濃青、`TEMPERATURE_HOT_CELSIUS` 以上なら濃赤、
+ * 中央付近（0 °C）は白っぽく半透明。
+ */
+function buildTemperatureBitmap(
+  temperature: TemperatureResult,
+  monthIndex: number | null,
+  grid: Grid,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const sourceMap =
+    monthIndex !== null
+      ? temperature.monthlyTemperatureCelsius[monthIndex]
+      : temperature.annualMeanTemperatureCelsius;
+  if (!sourceMap) return off;
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+  const range = TEMPERATURE_HOT_CELSIUS - TEMPERATURE_COLD_CELSIUS;
+
+  for (let r = 0; r < rows; r++) {
+    const tempRow = sourceMap[r];
+    if (!tempRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const t = tempRow[c];
+      if (t === undefined || !Number.isFinite(t)) continue;
+      const offset = (imageY * cols + c) * 4;
+      // -1..+1 に正規化（-30 = -1、+30 = +1）
+      const normalized = Math.max(-1, Math.min(1, (t - (TEMPERATURE_COLD_CELSIUS + range / 2)) / (range / 2)));
+      // 青(80,130,220) → 白(240,240,240) → 赤(220,80,60) の補間
+      let red: number;
+      let green: number;
+      let blue: number;
+      if (normalized < 0) {
+        const k = -normalized;
+        red = Math.round(240 + (80 - 240) * k);
+        green = Math.round(240 + (130 - 240) * k);
+        blue = Math.round(240 + (220 - 240) * k);
+      } else {
+        const k = normalized;
+        red = Math.round(240 + (220 - 240) * k);
+        green = Math.round(240 + (80 - 240) * k);
+        blue = Math.round(240 + (60 - 240) * k);
+      }
+      data[offset] = red;
+      data[offset + 1] = green;
+      data[offset + 2] = blue;
+      data[offset + 3] = TEMPERATURE_HEATMAP_ALPHA;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
 /** 海氷の表示用フェード幅（°）。しきい値の前後 SEA_ICE_FADE_WIDTH_DEG で α を線形補間する。 */
 const SEA_ICE_FADE_WIDTH_DEG = 5;
 /** 海氷の最大不透明度（α 1 のときの最終 alpha 値、255 中）。 */
@@ -495,6 +578,89 @@ function drawOverlayBitmap(
   ctx.imageSmoothingEnabled = previousSmoothing;
 }
 
+/**
+ * 等温線（[docs/spec/05_気温.md §4.12]）を白系の細線で描く。
+ *
+ * 各等値レベルを 1 本の連続線としてではなく独立セグメント集合として渡されるため、
+ * セグメント単位で stroke する。ラベル（温度値）は経度 0° の交点付近に小さく表示。
+ *
+ * 経度方向は 3 オフセット（norm-W / norm / norm+W）で循環描画。
+ * 0°C 線は強調（黄色 + 太め）、その他は淡い水色。
+ */
+function drawIsotherms(
+  ctx: CanvasRenderingContext2D,
+  isotherms: ReadonlyArray<IsothermLine>,
+  normPanPx: number,
+): void {
+  ctx.lineCap = 'round';
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (const line of isotherms) {
+    const isFreezingPoint = Math.abs(line.temperatureCelsius) < 1e-6;
+    ctx.strokeStyle = isFreezingPoint ? '#f0e060' : '#b0d0e0';
+    ctx.lineWidth = isFreezingPoint ? 1.4 : 0.9;
+
+    for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+      ctx.beginPath();
+      for (const seg of line.segments) {
+        const { x: x0, y: y0 } = projectRaw(
+          seg.start.latitudeDeg,
+          seg.start.longitudeDeg,
+          VIEWPORT,
+          drawOffset,
+        );
+        const { x: x1, y: y1 } = projectRaw(
+          seg.end.latitudeDeg,
+          seg.end.longitudeDeg,
+          VIEWPORT,
+          drawOffset,
+        );
+        // 経度をまたぐ長い線分（pan ループのアーティファクト）は描画しない
+        const dxAbs = Math.abs(x1 - x0);
+        if (dxAbs > CANVAS_WIDTH_PX / 2) continue;
+        if (x0 < -50 && x1 < -50) continue;
+        if (x0 > CANVAS_WIDTH_PX + 50 && x1 > CANVAS_WIDTH_PX + 50) continue;
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // ラベル: 線描画と同じく 3 オフセットで循環描画する。
+  // 経度 0° 付近の代表セグメントを 1 つ選び、その位置を 3 タイル分（西/中央/東）に
+  // 投影してラベルを置く。pan で経度 0° タイルが画面外に出ても、隣接タイルのラベルが
+  // 見える状態を維持する。
+  for (const line of isotherms) {
+    const isFreezingPoint = Math.abs(line.temperatureCelsius) < 1e-6;
+    // 経度 0° に最も近いセグメントを 1 つ選ぶ（描画は 3 オフセットで重複）
+    let representative: { lat: number; lon: number } | null = null;
+    for (const seg of line.segments) {
+      const midLon = (seg.start.longitudeDeg + seg.end.longitudeDeg) / 2;
+      if (Math.abs(midLon) < 5) {
+        representative = {
+          lat: (seg.start.latitudeDeg + seg.end.latitudeDeg) / 2,
+          lon: midLon,
+        };
+        break;
+      }
+    }
+    if (!representative) continue;
+    for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+      const { x, y } = projectRaw(representative.lat, representative.lon, VIEWPORT, drawOffset);
+      // ラベル幅相当（30px）を超えて画面外なら省略
+      if (x < -30 || x > CANVAS_WIDTH_PX + 30) continue;
+      // 影で輪郭
+      ctx.fillStyle = '#0a1722';
+      ctx.fillText(`${line.temperatureCelsius}°`, x + 1, y + 1);
+      ctx.fillStyle = isFreezingPoint ? '#f0e060' : '#d8e6f4';
+      ctx.fillText(`${line.temperatureCelsius}°`, x, y);
+    }
+  }
+}
+
 /** Step 4 の気圧中心（H = 高気圧 / L = 低気圧）を文字マーカーで描く。 */
 function drawPressureCenters(
   ctx: CanvasRenderingContext2D,
@@ -512,7 +678,8 @@ function drawPressureCenters(
         VIEWPORT,
         drawOffset,
       );
-      if (x < -20 || x > CANVAS_WIDTH_PX + 20) continue;
+      // マーカー文字幅は 10px 程度、その半分の余白を取る
+      if (x < -10 || x > CANVAS_WIDTH_PX + 10) continue;
       const isHigh = center.type === 'high';
       const label = isHigh ? 'H' : 'L';
       const color = isHigh ? '#f04040' : '#4090f0';
@@ -525,7 +692,14 @@ function drawPressureCenters(
   }
 }
 
-/** 最終地表風（Step 4）を Step 2 と同じ格子点に色違い（黄系）の矢印で描く。 */
+/** 最終地表風（Step 4）を Step 2 と同じ格子点に色違い（黄系）の矢印で描く。
+ *
+ * 3 オフセット（西タイル / 主タイル / 東タイル）すべてに描画し、cull は **行わない**。
+ * サンプル数（~12 lon × 11 lat × 3 offset = 396 矢印）は小さく、Canvas クリッピングが
+ * 自動で off-canvas を切り捨てる。cull check を入れると、サンプル離散点と margin の
+ * 関係で「東縁から少し外に出た wrap 矢印」が消えてしまい、pan 中の見た目が断続的になる
+ * （[開発ガイド.md §6.2.2]）。
+ */
 function drawFinalWindVectors(
   ctx: CanvasRenderingContext2D,
   windField: GridMap<WindVector>,
@@ -552,7 +726,6 @@ function drawFinalWindVectors(
         const wind = row[j];
         if (!wind) continue;
         const { x: x0, y: y0 } = projectRaw(lat, lon, VIEWPORT, drawOffset);
-        if (x0 < -50 || x0 > CANVAS_WIDTH_PX + 50) continue;
         const dx = wind.uMps * speedToPx;
         const dy = -wind.vMps * speedToPx;
         const x1 = x0 + dx;
@@ -618,7 +791,7 @@ function drawWindVectors(
         if (!wind) continue;
 
         const { x: x0, y: y0 } = projectRaw(lat, lon, VIEWPORT, drawOffset);
-        if (x0 < -50 || x0 > CANVAS_WIDTH_PX + 50) continue;
+        // cull は行わず Canvas クリッピングに任せる（[開発ガイド.md §6.2.2]）
 
         // 風ベクトルから矢印終点へ。Canvas の Y は北 = 0、南 = height。v(北向き正) は -dy で反映。
         const dx = wind.uMps * speedToPx;
@@ -679,11 +852,13 @@ function drawMap(
   oceanCurrentBitmap: HTMLCanvasElement | null,
   seaIceBitmap: HTMLCanvasElement | null,
   pressureAnomalyBitmap: HTMLCanvasElement | null,
+  temperatureBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
   finalWindField: GridMap<WindVector> | null,
   pressureCenters: ReadonlyArray<PressureCenter> | null,
+  isotherms: ReadonlyArray<IsothermLine> | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -704,6 +879,10 @@ function drawMap(
   // 圧力 anomaly ヒートマップ（陸海の上）
   if (legendVisibility.pressureAnomaly && pressureAnomalyBitmap) {
     drawOverlayBitmap(ctx, pressureAnomalyBitmap, norm);
+  }
+  // 気温ヒートマップ（陸海の上、半透明で地形が透けて見える）
+  if (legendVisibility.temperatureHeatmap && temperatureBitmap) {
+    drawOverlayBitmap(ctx, temperatureBitmap, norm);
   }
   // 海氷は最後に陸海の上にかぶせる（白で覆う）。
   if (legendVisibility.seaIce && seaIceBitmap) {
@@ -727,6 +906,9 @@ function drawMap(
   if (legendVisibility.pressureCenters && pressureCenters && pressureCenters.length > 0) {
     drawPressureCenters(ctx, pressureCenters, norm);
   }
+  if (legendVisibility.isotherms && isotherms && isotherms.length > 0) {
+    drawIsotherms(ctx, isotherms, norm);
+  }
 }
 
 /**
@@ -742,6 +924,7 @@ export function MapCanvas() {
   const windBelt = useResultsStore((s) => s.windBelt);
   const oceanCurrent = useResultsStore((s) => s.oceanCurrent);
   const airflow = useResultsStore((s) => s.airflow);
+  const temperature = useResultsStore((s) => s.temperature);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
@@ -780,6 +963,20 @@ export function MapCanvas() {
     const monthIndex = currentSeason === 'annual' ? null : currentSeason;
     return buildPressureAnomalyBitmap(airflow, monthIndex, grid);
   }, [airflow, currentSeason, grid]);
+
+  // 気温ヒートマップ（temperature + currentSeason 依存）
+  const temperatureBitmap = useMemo(() => {
+    if (!temperature || !grid) return null;
+    const monthIndex = currentSeason === 'annual' ? null : currentSeason;
+    return buildTemperatureBitmap(temperature, monthIndex, grid);
+  }, [temperature, currentSeason, grid]);
+
+  // 等温線（temperature + currentSeason 依存）
+  const isothermsForSeason = useMemo<ReadonlyArray<IsothermLine> | null>(() => {
+    if (!temperature) return null;
+    if (currentSeason === 'annual') return temperature.annualIsotherms;
+    return temperature.monthlyIsotherms[currentSeason] ?? null;
+  }, [temperature, currentSeason]);
 
   // Step 4 の気圧中心（年平均は最強月を採用、月別はその月）
   const pressureCenters = useMemo<ReadonlyArray<PressureCenter> | null>(() => {
@@ -908,11 +1105,13 @@ export function MapCanvas() {
       oceanCurrentBitmap,
       seaIceBitmap,
       pressureAnomalyBitmap,
+      temperatureBitmap,
       influenceBandBitmap,
       bands,
       windField,
       finalWindField,
       pressureCenters,
+      isothermsForSeason,
       grid,
       legendVisibility,
     );
@@ -922,11 +1121,13 @@ export function MapCanvas() {
     oceanCurrentBitmap,
     seaIceBitmap,
     pressureAnomalyBitmap,
+    temperatureBitmap,
     influenceBandBitmap,
     bands,
     windField,
     finalWindField,
     pressureCenters,
+    isothermsForSeason,
     grid,
     legendVisibility,
   ]);

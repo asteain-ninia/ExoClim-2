@@ -46,7 +46,8 @@ test.describe('P4-6: Step 2 風帯', () => {
       const px = ctx.getImageData(c.width / 2, c.height / 2, 1, 1).data;
       return (px[0] ?? 0) > 0 || (px[1] ?? 0) > 0 || (px[2] ?? 0) > 0;
     });
-    await page.waitForTimeout(200);
+    // Step 5 を pipeline に追加して初期計算が長くなったため十分な待機を取る。
+    await page.waitForTimeout(900);
   });
 
   test('Step 2 風帯パネル（3 スライダー）が表示される', async ({ page }) => {
@@ -80,8 +81,9 @@ test.describe('P4-6: Step 2 風帯', () => {
     const before = await canvasFingerprint(page);
     await setRangeValue(page, 'slider-wind-mean-speed', '15');
     // P4-8 で Step 4 の追加処理（pressureCenter 検出 12 ヶ月分・mountain deflection・
-    // monsoon reversal）により pipeline が重くなったため、十分な待機時間を確保する。
-    await page.waitForTimeout(700);
+    // monsoon reversal）+ P4-9 で Step 5 の追加処理（緯度別日射 + 海岸距離 BFS + 雪氷反復）
+    // により pipeline が重くなったため、十分な待機時間を確保する。
+    await page.waitForTimeout(1100);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });

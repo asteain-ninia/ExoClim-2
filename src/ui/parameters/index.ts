@@ -8,5 +8,6 @@ export { OceanCurrentStepParamsSliders } from './OceanCurrentStepParamsSliders';
 export { OrbitalSliders } from './OrbitalSliders';
 export { PlanetBodySliders } from './PlanetBodySliders';
 export { Slider } from './Slider';
+export { TemperatureStepParamsSliders } from './TemperatureStepParamsSliders';
 export { TerrainSourceSelector } from './TerrainSourceSelector';
 export { WindBeltStepParamsSliders } from './WindBeltStepParamsSliders';

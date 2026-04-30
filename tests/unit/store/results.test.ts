@@ -4,6 +4,7 @@ import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
+  DEFAULT_TEMPERATURE_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
 } from '@/sim';
 import { createResultsStore } from '@/store/results';
@@ -34,6 +35,7 @@ describe('store/results: 結果 store', () => {
           windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
           oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
           airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
+          temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );
@@ -50,6 +52,7 @@ describe('store/results: 結果 store', () => {
         windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
         oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
         airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
+        temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
       };
       const first = runPipeline(inputs, EMPTY_PIPELINE_CACHE);
       const second = runPipeline(inputs, first.cache);
@@ -68,6 +71,7 @@ describe('store/results: 結果 store', () => {
           windBeltParams: DEFAULT_WIND_BELT_STEP_PARAMS,
           oceanCurrentParams: DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
           airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
+          temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );

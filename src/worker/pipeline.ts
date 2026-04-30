@@ -7,8 +7,8 @@
 //   - 純粋関数として動作（cache を入力で受け取り、新しい cache を返す）。
 //   - 各 Step は前回 inputs と deep equality で比較し、一致すればキャッシュ出力を返す。
 //   - 浮動小数点数は Object.is で厳密一致（[技術方針.md §2.2.3] / [開発ガイド.md §6.1.1]）。
-// 範囲（P4-8 時点）:
-//   - Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流を連結。Step 5〜7 は P4-9 以降で順次追加。
+// 範囲（P4-9 時点）:
+//   - Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温を連結。Step 6〜7 は P4-10 以降で順次追加。
 
 import type {
   AirflowResult,
@@ -16,18 +16,21 @@ import type {
   ITCZResult,
   OceanCurrentResult,
   PlanetParams,
+  TemperatureResult,
   WindBeltResult,
 } from '@/domain';
 import type {
   AirflowStepParams,
   ITCZStepParams,
   OceanCurrentStepParams,
+  TemperatureStepParams,
   WindBeltStepParams,
 } from '@/sim';
 import {
   computeAirflow,
   computeITCZ,
   computeOceanCurrent,
+  computeTemperature,
   computeWindBelt,
 } from '@/sim';
 
@@ -73,15 +76,27 @@ interface AirflowStepInputs {
   readonly params: AirflowStepParams;
 }
 
+/** Step 5 気温への入力（キャッシュキーの構成要素）。 */
+interface TemperatureStepInputs {
+  readonly planet: PlanetParams;
+  readonly grid: Grid;
+  readonly itczResult: ITCZResult;
+  readonly windBeltResult: WindBeltResult;
+  readonly oceanCurrentResult: OceanCurrentResult;
+  readonly airflowResult: AirflowResult;
+  readonly params: TemperatureStepParams;
+}
+
 /**
  * パイプライン全体のキャッシュ状態。
- * Step 5〜7 は P4-9 以降で追加する。
+ * Step 6〜7 は P4-10 以降で追加する。
  */
 export interface PipelineCache {
   readonly itcz: StepCacheEntry<ITCZStepInputs, ITCZResult> | null;
   readonly windBelt: StepCacheEntry<WindBeltStepInputs, WindBeltResult> | null;
   readonly oceanCurrent: StepCacheEntry<OceanCurrentStepInputs, OceanCurrentResult> | null;
   readonly airflow: StepCacheEntry<AirflowStepInputs, AirflowResult> | null;
+  readonly temperature: StepCacheEntry<TemperatureStepInputs, TemperatureResult> | null;
 }
 
 /** 空のパイプラインキャッシュ。初回起動時の状態。 */
@@ -90,6 +105,7 @@ export const EMPTY_PIPELINE_CACHE: PipelineCache = {
   windBelt: null,
   oceanCurrent: null,
   airflow: null,
+  temperature: null,
 };
 
 /** ワーカー層 pipeline への入力。 */
@@ -100,11 +116,12 @@ export interface PipelineInputs {
   readonly windBeltParams: WindBeltStepParams;
   readonly oceanCurrentParams: OceanCurrentStepParams;
   readonly airflowParams: AirflowStepParams;
+  readonly temperatureParams: TemperatureStepParams;
 }
 
 /**
  * パイプライン実行結果。
- * 現状は Step 1〜4。Step 5〜7 が連結されると SimulationResult 全体に拡張される。
+ * 現状は Step 1〜5。Step 6〜7 が連結されると SimulationResult 全体に拡張される。
  */
 export interface PipelineOutput {
   /** Step 1 ITCZ の結果。 */
@@ -115,12 +132,15 @@ export interface PipelineOutput {
   readonly oceanCurrent: OceanCurrentResult;
   /** Step 4 気流の結果。 */
   readonly airflow: AirflowResult;
+  /** Step 5 気温の結果。 */
+  readonly temperature: TemperatureResult;
   /** 各 Step がキャッシュからヒットしたかのトレース（[要件定義書.md §3.1] 部分再計算の検証用）。 */
   readonly cacheHits: {
     readonly itcz: boolean;
     readonly windBelt: boolean;
     readonly oceanCurrent: boolean;
     readonly airflow: boolean;
+    readonly temperature: boolean;
   };
 }
 
@@ -142,8 +162,8 @@ function getOrCompute<TIn, TOut>(
  *
  * 引数で受け取った cache を変更しない（純粋関数）。利用者は次回呼び出しで戻り値の cache を渡す。
  *
- * Step 2 のキャッシュキーは Step 1 の出力を含むため、Step 1 が再計算されると Step 2 も再計算される。
- * Step 1 がキャッシュヒット（同 ITCZResult 参照）なら、Step 2 のキャッシュ判定は windBeltParams 等の
+ * 各 Step のキャッシュキーは前段の出力を含むため、前段が再計算されると後段も再計算される。
+ * 前段がキャッシュヒット（同参照）なら、後段のキャッシュ判定は当該 Step 固有のパラメータの
  * 変化のみで決まる（[技術方針.md §2.2.3] 部分再計算の指針）。
  */
 export function runPipeline(
@@ -196,17 +216,41 @@ export function runPipeline(
     computeAirflow(i.planet, i.grid, i.itczResult, i.windBeltResult, i.oceanCurrentResult, i.params),
   );
 
+  // === Step 5 気温 ===
+  const temperatureInputs: TemperatureStepInputs = {
+    planet: inputs.planet,
+    grid: inputs.grid,
+    itczResult: itczStep.entry.output,
+    windBeltResult: windBeltStep.entry.output,
+    oceanCurrentResult: oceanCurrentStep.entry.output,
+    airflowResult: airflowStep.entry.output,
+    params: inputs.temperatureParams,
+  };
+  const temperatureStep = getOrCompute(cache.temperature, temperatureInputs, (i) =>
+    computeTemperature(
+      i.planet,
+      i.grid,
+      i.itczResult,
+      i.windBeltResult,
+      i.oceanCurrentResult,
+      i.airflowResult,
+      i.params,
+    ),
+  );
+
   return {
     output: {
       itcz: itczStep.entry.output,
       windBelt: windBeltStep.entry.output,
       oceanCurrent: oceanCurrentStep.entry.output,
       airflow: airflowStep.entry.output,
+      temperature: temperatureStep.entry.output,
       cacheHits: {
         itcz: itczStep.fromCache,
         windBelt: windBeltStep.fromCache,
         oceanCurrent: oceanCurrentStep.fromCache,
         airflow: airflowStep.fromCache,
+        temperature: temperatureStep.fromCache,
       },
     },
     cache: {
@@ -214,6 +258,7 @@ export function runPipeline(
       windBelt: windBeltStep.entry,
       oceanCurrent: oceanCurrentStep.entry,
       airflow: airflowStep.entry,
+      temperature: temperatureStep.entry,
     },
   };
 }

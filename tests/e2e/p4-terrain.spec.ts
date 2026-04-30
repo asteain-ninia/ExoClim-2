@@ -61,8 +61,8 @@ test.describe('P4-terrain: 地球プリセットで陸地が描画される', ()
     });
 
     // 単純な海色 (#0e2233 = 14, 34, 51) のみだった場合の理論上限
-    // 1 ピクセルの RGB sum ≈ 99、960×480 ÷ 16 サンプル ≈ 28800 → 全海ベース ≈ 2,851,200
+    // 1 ピクセルの RGB sum ≈ 99、1260×630 ÷ 16 サンプル ≈ 49613 → 全海ベース ≈ 4,911,687
     // 地球地形が乗ると land ピクセルで R+G+B が増えるので fingerprint > 全海ベース
-    expect(earthFingerprint).toBeGreaterThan(2_851_200);
+    expect(earthFingerprint).toBeGreaterThan(4_911_687);
   });
 });

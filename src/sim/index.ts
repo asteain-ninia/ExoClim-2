@@ -17,3 +17,6 @@ export {
 
 export type { AirflowStepParams } from './04_airflow';
 export { DEFAULT_AIRFLOW_STEP_PARAMS, computeAirflow } from './04_airflow';
+
+export type { TemperatureStepParams } from './05_temperature';
+export { DEFAULT_TEMPERATURE_STEP_PARAMS, computeTemperature } from './05_temperature';
