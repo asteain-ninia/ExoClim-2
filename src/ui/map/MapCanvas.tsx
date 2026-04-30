@@ -15,6 +15,7 @@ import {
 import type {
   AirflowResult,
   Cell,
+  ClimateZoneResult,
   Grid,
   GridMap,
   IsothermLine,
@@ -598,6 +599,96 @@ function buildPrecipitationBitmap(
   return off;
 }
 
+/**
+ * Köppen-Geiger 気候帯の表示色（[docs/spec/07_気候帯.md §5]）。
+ * Wikipedia / Pasta `koppenpasta` の標準配色を踏襲（A 群青、B 群暖色、C 群緑、D 群紫、E 群灰）。
+ * 未マッピングのコード（系統 2 等）はフォールバックで透明扱い。
+ */
+const KOPPEN_ZONE_COLORS: Readonly<Record<string, RGB>> = {
+  // Tropical (A)
+  Af: { r: 0, g: 0, b: 254 },
+  Am: { r: 0, g: 119, b: 255 },
+  As: { r: 70, g: 169, b: 250 },
+  Aw: { r: 70, g: 169, b: 250 },
+  // Arid (B)
+  BWh: { r: 255, g: 0, b: 0 },
+  BWk: { r: 255, g: 150, b: 150 },
+  BSh: { r: 245, g: 165, b: 0 },
+  BSk: { r: 255, g: 220, b: 100 },
+  // Temperate (C)
+  Csa: { r: 255, g: 255, b: 0 },
+  Csb: { r: 198, g: 199, b: 0 },
+  Csc: { r: 150, g: 150, b: 0 },
+  Cwa: { r: 150, g: 255, b: 150 },
+  Cwb: { r: 100, g: 200, b: 100 },
+  Cwc: { r: 50, g: 150, b: 50 },
+  Cfa: { r: 200, g: 255, b: 80 },
+  Cfb: { r: 100, g: 255, b: 80 },
+  Cfc: { r: 50, g: 200, b: 0 },
+  // Continental (D)
+  Dsa: { r: 255, g: 0, b: 255 },
+  Dsb: { r: 200, g: 0, b: 200 },
+  Dsc: { r: 150, g: 50, b: 150 },
+  Dsd: { r: 150, g: 100, b: 150 },
+  Dwa: { r: 170, g: 175, b: 255 },
+  Dwb: { r: 90, g: 120, b: 220 },
+  Dwc: { r: 75, g: 80, b: 180 },
+  Dwd: { r: 50, g: 0, b: 135 },
+  Dfa: { r: 0, g: 255, b: 255 },
+  Dfb: { r: 56, g: 200, b: 200 },
+  Dfc: { r: 0, g: 125, b: 125 },
+  Dfd: { r: 0, g: 70, b: 95 },
+  // Polar (E)
+  ET: { r: 178, g: 178, b: 178 },
+  EF: { r: 102, g: 102, b: 102 },
+};
+
+/** 気候帯 overlay の不透明度（255 中、地形が透けて見える程度）。 */
+const CLIMATE_ZONE_ALPHA = 200;
+
+/**
+ * 気候帯 overlay ビットマップを構築する（[docs/spec/07_気候帯.md §5]）。
+ *
+ * セル毎に `zoneCodes[i][j]` を読み、Köppen 配色テーブルで RGB 化する。
+ * 海洋セル（`zoneCodes[i][j] === null`）は透明。系統 2（Pasta Bioclimate System）の
+ * コードは現状フォールバック（未マッピングは透明）として扱い、Phase 4 後段で配色を追加する。
+ */
+function buildClimateZoneBitmap(
+  climateZone: ClimateZoneResult,
+  grid: Grid,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const codeRow = climateZone.zoneCodes[r];
+    if (!codeRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      const code = codeRow[c];
+      if (!code) continue; // 海洋セルは透明
+      const color = KOPPEN_ZONE_COLORS[code];
+      if (!color) continue; // 未マッピングコードは透明
+      const offset = (imageY * cols + c) * 4;
+      data[offset] = color.r;
+      data[offset + 1] = color.g;
+      data[offset + 2] = color.b;
+      data[offset + 3] = CLIMATE_ZONE_ALPHA;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
 /** 海氷の表示用フェード幅（°）。しきい値の前後 SEA_ICE_FADE_WIDTH_DEG で α を線形補間する。 */
 const SEA_ICE_FADE_WIDTH_DEG = 5;
 /** 海氷の最大不透明度（α 1 のときの最終 alpha 値、255 中）。 */
@@ -944,6 +1035,7 @@ function drawMap(
   pressureAnomalyBitmap: HTMLCanvasElement | null,
   temperatureBitmap: HTMLCanvasElement | null,
   precipitationBitmap: HTMLCanvasElement | null,
+  climateZoneBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
@@ -978,6 +1070,10 @@ function drawMap(
   // 降水ラベル overlay（陸地のみ、半透明）
   if (legendVisibility.precipitationLabels && precipitationBitmap) {
     drawOverlayBitmap(ctx, precipitationBitmap, norm);
+  }
+  // 気候帯 overlay（陸地のみ、Köppen 配色）— 最終出力なので半透明度高めで主役表示
+  if (legendVisibility.climateZones && climateZoneBitmap) {
+    drawOverlayBitmap(ctx, climateZoneBitmap, norm);
   }
   // 海氷は最後に陸海の上にかぶせる（白で覆う）。
   if (legendVisibility.seaIce && seaIceBitmap) {
@@ -1021,6 +1117,7 @@ export function MapCanvas() {
   const airflow = useResultsStore((s) => s.airflow);
   const temperature = useResultsStore((s) => s.temperature);
   const precipitation = useResultsStore((s) => s.precipitation);
+  const climateZone = useResultsStore((s) => s.climateZone);
   const grid = useResultsStore((s) => s.grid);
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
@@ -1073,6 +1170,12 @@ export function MapCanvas() {
     const monthIndex = currentSeason === 'annual' ? null : currentSeason;
     return buildPrecipitationBitmap(precipitation, monthIndex, grid);
   }, [precipitation, currentSeason, grid]);
+
+  // 気候帯 overlay ビットマップ（climateZone + grid 依存、季節非依存）
+  const climateZoneBitmap = useMemo(
+    () => (climateZone && grid ? buildClimateZoneBitmap(climateZone, grid) : null),
+    [climateZone, grid],
+  );
 
   // 等温線（temperature + currentSeason 依存）
   const isothermsForSeason = useMemo<ReadonlyArray<IsothermLine> | null>(() => {
@@ -1210,6 +1313,7 @@ export function MapCanvas() {
       pressureAnomalyBitmap,
       temperatureBitmap,
       precipitationBitmap,
+      climateZoneBitmap,
       influenceBandBitmap,
       bands,
       windField,
@@ -1227,6 +1331,7 @@ export function MapCanvas() {
     pressureAnomalyBitmap,
     temperatureBitmap,
     precipitationBitmap,
+    climateZoneBitmap,
     influenceBandBitmap,
     bands,
     windField,

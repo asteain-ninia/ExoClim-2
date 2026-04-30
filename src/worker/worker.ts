@@ -47,6 +47,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => 
       airflowParams: message.airflowParams,
       temperatureParams: message.temperatureParams,
       precipitationParams: message.precipitationParams,
+      climateZoneParams: message.climateZoneParams,
     };
     const result = runPipeline(inputs, cache);
     cache = result.cache;

@@ -93,6 +93,7 @@ export function connectStoresToBridge(
           airflowParams: params.airflowParams,
           temperatureParams: params.temperatureParams,
           precipitationParams: params.precipitationParams,
+          climateZoneParams: params.climateZoneParams,
         };
         const output = await bridge.run(inputs);
         resultsStore.getState().setOutput(output);

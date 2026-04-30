@@ -23,3 +23,6 @@ export { DEFAULT_TEMPERATURE_STEP_PARAMS, computeTemperature } from './05_temper
 
 export type { PrecipitationStepParams } from './06_precipitation';
 export { DEFAULT_PRECIPITATION_STEP_PARAMS, computePrecipitation } from './06_precipitation';
+
+export type { ClimateZoneStepParams } from './07_climate_zone';
+export { DEFAULT_CLIMATE_ZONE_STEP_PARAMS, computeClimateZone } from './07_climate_zone';

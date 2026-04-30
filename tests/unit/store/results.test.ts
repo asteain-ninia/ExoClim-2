@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
 import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
+  DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_PRECIPITATION_STEP_PARAMS,
@@ -38,6 +39,7 @@ describe('store/results: 結果 store', () => {
           airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
           temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
           precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+          climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );
@@ -56,6 +58,7 @@ describe('store/results: 結果 store', () => {
         airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
         temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
         precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+        climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
       };
       const first = runPipeline(inputs, EMPTY_PIPELINE_CACHE);
       const second = runPipeline(inputs, first.cache);
@@ -76,6 +79,7 @@ describe('store/results: 結果 store', () => {
           airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
           temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
           precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+          climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
         },
         EMPTY_PIPELINE_CACHE,
       );

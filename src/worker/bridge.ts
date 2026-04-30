@@ -10,6 +10,7 @@
 import type { Grid, PlanetParams } from '@/domain';
 import type {
   AirflowStepParams,
+  ClimateZoneStepParams,
   ITCZStepParams,
   OceanCurrentStepParams,
   PrecipitationStepParams,
@@ -77,6 +78,7 @@ interface WorkerRunRequest {
   readonly airflowParams: AirflowStepParams;
   readonly temperatureParams: TemperatureStepParams;
   readonly precipitationParams: PrecipitationStepParams;
+  readonly climateZoneParams: ClimateZoneStepParams;
 }
 
 export type WorkerInboundMessage = WorkerGridUpdateRequest | WorkerRunRequest;
@@ -138,6 +140,7 @@ export function createWorkerPipelineBridge(): PipelineBridge {
           airflowParams: inputs.airflowParams,
           temperatureParams: inputs.temperatureParams,
           precipitationParams: inputs.precipitationParams,
+          climateZoneParams: inputs.climateZoneParams,
         };
         worker.postMessage(runMessage);
       });

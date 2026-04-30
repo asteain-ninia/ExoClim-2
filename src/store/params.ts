@@ -17,12 +17,14 @@ import {
 } from '@/domain';
 import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
+  DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_PRECIPITATION_STEP_PARAMS,
   DEFAULT_TEMPERATURE_STEP_PARAMS,
   DEFAULT_WIND_BELT_STEP_PARAMS,
   type AirflowStepParams,
+  type ClimateZoneStepParams,
   type ITCZStepParams,
   type OceanCurrentStepParams,
   type PrecipitationStepParams,
@@ -51,6 +53,7 @@ export interface ParamsState {
   readonly airflowParams: AirflowStepParams;
   readonly temperatureParams: TemperatureStepParams;
   readonly precipitationParams: PrecipitationStepParams;
+  readonly climateZoneParams: ClimateZoneStepParams;
 }
 
 export interface ParamsActions {
@@ -74,6 +77,16 @@ export interface ParamsActions {
   readonly setTemperatureParams: (patch: Partial<TemperatureStepParams>) => void;
   /** Step 6 降水パラメータを部分更新する。 */
   readonly setPrecipitationParams: (patch: Partial<PrecipitationStepParams>) => void;
+  /**
+   * Step 7 気候帯パラメータを部分更新する。
+   * ネストした `precipitationMmByLabel` も Partial で受け取り、深くマージする
+   * （例: `{ precipitationMmByLabel: { dry: 5 } }` で dry のみ更新可能）。
+   */
+  readonly setClimateZoneParams: (
+    patch: Partial<Omit<ClimateZoneStepParams, 'precipitationMmByLabel'>> & {
+      readonly precipitationMmByLabel?: Partial<ClimateZoneStepParams['precipitationMmByLabel']>;
+    },
+  ) => void;
   /** 初期値（地球プリセット + デフォルト Step パラメータ）に戻す。 */
   readonly reset: () => void;
 }
@@ -88,6 +101,7 @@ const INITIAL_PARAMS_STATE: ParamsState = {
   airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
   temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
   precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+  climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
 };
 
 /**
@@ -126,6 +140,17 @@ export const createParamsStore = () =>
       set((state) => ({ temperatureParams: { ...state.temperatureParams, ...patch } })),
     setPrecipitationParams: (patch) =>
       set((state) => ({ precipitationParams: { ...state.precipitationParams, ...patch } })),
+    setClimateZoneParams: (patch) =>
+      set((state) => ({
+        climateZoneParams: {
+          ...state.climateZoneParams,
+          ...patch,
+          // ネスト構造（precipitationMmByLabel）は patch があれば深くマージ
+          precipitationMmByLabel: patch.precipitationMmByLabel
+            ? { ...state.climateZoneParams.precipitationMmByLabel, ...patch.precipitationMmByLabel }
+            : state.climateZoneParams.precipitationMmByLabel,
+        },
+      })),
     reset: () => set(INITIAL_PARAMS_STATE),
   }));
 

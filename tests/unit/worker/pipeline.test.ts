@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
 import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
+  DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_PRECIPITATION_STEP_PARAMS,
@@ -23,6 +24,7 @@ const baseInputs = (): PipelineInputs => ({
   airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
   temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
   precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+  climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
 });
 
 describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ骨格）', () => {
@@ -66,6 +68,7 @@ describe('worker/pipeline: runPipeline（Step 1 のみ連結 + キャッシュ�
         airflowParams: { ...inputs1.airflowParams },
         temperatureParams: { ...inputs1.temperatureParams },
         precipitationParams: { ...inputs1.precipitationParams },
+        climateZoneParams: { ...inputs1.climateZoneParams },
       };
       const second = runPipeline(inputs2, first.cache);
       expect(second.output.cacheHits.itcz).toBe(true);

@@ -22,7 +22,7 @@ export type SeasonPhaseView = 'annual' | number;
 
 /**
  * 凡例・補助線の表示／非表示フラグ集合（[要件定義書.md §2.3.2]）。
- * Step 1〜6 連結。Step 7 連結時に項目を追加する。
+ * Step 1〜7 すべて連結済み。
  */
 export interface LegendVisibility {
   readonly itczCenterLine: boolean;
@@ -45,6 +45,8 @@ export interface LegendVisibility {
   readonly isotherms: boolean;
   /** Step 6 降水ラベル overlay 表示トグル（dry/normal/wet/very_wet の 4 階調塗り）。 */
   readonly precipitationLabels: boolean;
+  /** Step 7 気候帯 overlay 表示トグル（Köppen-Geiger 配色）。 */
+  readonly climateZones: boolean;
 }
 
 export interface UIState {
@@ -78,6 +80,7 @@ const INITIAL_UI_STATE: UIState = {
     temperatureHeatmap: false, // 気温ヒートマップ（既定 OFF、地形が見えなくなるため）
     isotherms: true,           // 等温線（既定 ON、地形を阻害せず温度勾配を読み取れる）
     precipitationLabels: false, // 降水ラベル overlay（既定 OFF、地形が見えなくなるため）
+    climateZones: false,        // 気候帯 overlay（既定 OFF、地形が見えなくなるため）
   },
 };
 

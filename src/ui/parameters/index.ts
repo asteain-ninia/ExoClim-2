@@ -3,6 +3,7 @@
 
 export { AirflowStepParamsSliders } from './AirflowStepParamsSliders';
 export { AtmosphereOceanSliders } from './AtmosphereOceanSliders';
+export { ClimateZoneStepParamsSliders } from './ClimateZoneStepParamsSliders';
 export { ITCZStepParamsSliders } from './ITCZStepParamsSliders';
 export { OceanCurrentStepParamsSliders } from './OceanCurrentStepParamsSliders';
 export { OrbitalSliders } from './OrbitalSliders';

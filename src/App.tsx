@@ -11,6 +11,7 @@ import {
 import {
   AirflowStepParamsSliders,
   AtmosphereOceanSliders,
+  ClimateZoneStepParamsSliders,
   ITCZStepParamsSliders,
   Legend,
   MapCanvas,
@@ -58,6 +59,7 @@ export function App() {
           <AirflowStepParamsSliders />
           <TemperatureStepParamsSliders />
           <PrecipitationStepParamsSliders />
+          <ClimateZoneStepParamsSliders />
         </section>
       </main>
     </div>

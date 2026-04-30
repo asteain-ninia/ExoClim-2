@@ -7,11 +7,12 @@
 //   - 純粋関数として動作（cache を入力で受け取り、新しい cache を返す）。
 //   - 各 Step は前回 inputs と deep equality で比較し、一致すればキャッシュ出力を返す。
 //   - 浮動小数点数は Object.is で厳密一致（[技術方針.md §2.2.3] / [開発ガイド.md §6.1.1]）。
-// 範囲（P4-10 時点）:
-//   - Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温 + Step 6 降水を連結。Step 7 は P4-11 で追加。
+// 範囲（P4-11 時点）:
+//   - Step 1 ITCZ + Step 2 風帯 + Step 3 海流 + Step 4 気流 + Step 5 気温 + Step 6 降水 + Step 7 気候帯を連結（全 Step 完了）。
 
 import type {
   AirflowResult,
+  ClimateZoneResult,
   Grid,
   ITCZResult,
   OceanCurrentResult,
@@ -22,6 +23,7 @@ import type {
 } from '@/domain';
 import type {
   AirflowStepParams,
+  ClimateZoneStepParams,
   ITCZStepParams,
   OceanCurrentStepParams,
   PrecipitationStepParams,
@@ -30,6 +32,7 @@ import type {
 } from '@/sim';
 import {
   computeAirflow,
+  computeClimateZone,
   computeITCZ,
   computeOceanCurrent,
   computePrecipitation,
@@ -102,9 +105,17 @@ interface PrecipitationStepInputs {
   readonly params: PrecipitationStepParams;
 }
 
+/** Step 7 気候帯への入力（キャッシュキーの構成要素）。 */
+interface ClimateZoneStepInputs {
+  readonly planet: PlanetParams;
+  readonly grid: Grid;
+  readonly precipitationResult: PrecipitationResult;
+  readonly temperatureResult: TemperatureResult;
+  readonly params: ClimateZoneStepParams;
+}
+
 /**
- * パイプライン全体のキャッシュ状態。
- * Step 7 は P4-11 で追加する。
+ * パイプライン全体のキャッシュ状態。Step 1〜7 が揃った最終形。
  */
 export interface PipelineCache {
   readonly itcz: StepCacheEntry<ITCZStepInputs, ITCZResult> | null;
@@ -113,6 +124,7 @@ export interface PipelineCache {
   readonly airflow: StepCacheEntry<AirflowStepInputs, AirflowResult> | null;
   readonly temperature: StepCacheEntry<TemperatureStepInputs, TemperatureResult> | null;
   readonly precipitation: StepCacheEntry<PrecipitationStepInputs, PrecipitationResult> | null;
+  readonly climateZone: StepCacheEntry<ClimateZoneStepInputs, ClimateZoneResult> | null;
 }
 
 /** 空のパイプラインキャッシュ。初回起動時の状態。 */
@@ -123,6 +135,7 @@ export const EMPTY_PIPELINE_CACHE: PipelineCache = {
   airflow: null,
   temperature: null,
   precipitation: null,
+  climateZone: null,
 };
 
 /** ワーカー層 pipeline への入力。 */
@@ -135,11 +148,11 @@ export interface PipelineInputs {
   readonly airflowParams: AirflowStepParams;
   readonly temperatureParams: TemperatureStepParams;
   readonly precipitationParams: PrecipitationStepParams;
+  readonly climateZoneParams: ClimateZoneStepParams;
 }
 
 /**
- * パイプライン実行結果。
- * 現状は Step 1〜6。Step 7 が連結されると SimulationResult 全体に拡張される。
+ * パイプライン実行結果。Step 1〜7 すべて連結済み（SimulationResult 全体）。
  */
 export interface PipelineOutput {
   /** Step 1 ITCZ の結果。 */
@@ -154,6 +167,8 @@ export interface PipelineOutput {
   readonly temperature: TemperatureResult;
   /** Step 6 降水の結果。 */
   readonly precipitation: PrecipitationResult;
+  /** Step 7 気候帯の結果。 */
+  readonly climateZone: ClimateZoneResult;
   /** 各 Step がキャッシュからヒットしたかのトレース（[要件定義書.md §3.1] 部分再計算の検証用）。 */
   readonly cacheHits: {
     readonly itcz: boolean;
@@ -162,6 +177,7 @@ export interface PipelineOutput {
     readonly airflow: boolean;
     readonly temperature: boolean;
     readonly precipitation: boolean;
+    readonly climateZone: boolean;
   };
 }
 
@@ -283,6 +299,18 @@ export function runPipeline(
     ),
   );
 
+  // === Step 7 気候帯 ===
+  const climateZoneInputs: ClimateZoneStepInputs = {
+    planet: inputs.planet,
+    grid: inputs.grid,
+    precipitationResult: precipitationStep.entry.output,
+    temperatureResult: temperatureStep.entry.output,
+    params: inputs.climateZoneParams,
+  };
+  const climateZoneStep = getOrCompute(cache.climateZone, climateZoneInputs, (i) =>
+    computeClimateZone(i.planet, i.grid, i.precipitationResult, i.temperatureResult, i.params),
+  );
+
   return {
     output: {
       itcz: itczStep.entry.output,
@@ -291,6 +319,7 @@ export function runPipeline(
       airflow: airflowStep.entry.output,
       temperature: temperatureStep.entry.output,
       precipitation: precipitationStep.entry.output,
+      climateZone: climateZoneStep.entry.output,
       cacheHits: {
         itcz: itczStep.fromCache,
         windBelt: windBeltStep.fromCache,
@@ -298,6 +327,7 @@ export function runPipeline(
         airflow: airflowStep.fromCache,
         temperature: temperatureStep.fromCache,
         precipitation: precipitationStep.fromCache,
+        climateZone: climateZoneStep.fromCache,
       },
     },
     cache: {
@@ -307,6 +337,7 @@ export function runPipeline(
       airflow: airflowStep.entry,
       temperature: temperatureStep.entry,
       precipitation: precipitationStep.entry,
+      climateZone: climateZoneStep.entry,
     },
   };
 }

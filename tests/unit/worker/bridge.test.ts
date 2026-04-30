@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { EARTH_PLANET_PARAMS, createGrid } from '@/domain';
 import {
   DEFAULT_AIRFLOW_STEP_PARAMS,
+  DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
   DEFAULT_ITCZ_STEP_PARAMS,
   DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
   DEFAULT_PRECIPITATION_STEP_PARAMS,
@@ -23,6 +24,7 @@ const baseInputs = (): PipelineInputs => ({
   airflowParams: DEFAULT_AIRFLOW_STEP_PARAMS,
   temperatureParams: DEFAULT_TEMPERATURE_STEP_PARAMS,
   precipitationParams: DEFAULT_PRECIPITATION_STEP_PARAMS,
+  climateZoneParams: DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
 });
 
 describe('worker/bridge: createDirectPipelineBridge', () => {

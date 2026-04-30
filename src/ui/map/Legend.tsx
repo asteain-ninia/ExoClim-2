@@ -155,6 +155,22 @@ export function Legend() {
             降水（Step 6、乾/湿/多湿）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.climateZones}
+              onChange={(e) => setLegendVisibility({ climateZones: e.target.checked })}
+              data-testid="legend-climate-zones"
+            />
+            <span className="legend-swatch legend-swatch--climate-a" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--climate-b" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--climate-c" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--climate-d" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--climate-e" aria-hidden="true" />
+            気候帯（Step 7、Köppen-Geiger）
+          </label>
+        </li>
       </ul>
       <p className="legend-panel__note">
         ※ 月別バンドは月選択ボタンで切替。地図はマウスドラッグで左右に無限スクロール可能。

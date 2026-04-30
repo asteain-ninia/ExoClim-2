@@ -264,6 +264,33 @@ body {
   width: 12px;
 }
 
+/* Köppen-Geiger 気候帯（A/B/C/D/E の主要群、各 9px 幅で並べて表示） */
+.legend-swatch--climate-a {
+  background: rgba(0, 100, 200, 0.85);
+  border-color: #0064c8;
+  width: 9px;
+}
+.legend-swatch--climate-b {
+  background: rgba(245, 165, 0, 0.85);
+  border-color: #f5a500;
+  width: 9px;
+}
+.legend-swatch--climate-c {
+  background: rgba(120, 200, 80, 0.85);
+  border-color: #78c850;
+  width: 9px;
+}
+.legend-swatch--climate-d {
+  background: rgba(100, 100, 230, 0.85);
+  border-color: #6464e6;
+  width: 9px;
+}
+.legend-swatch--climate-e {
+  background: rgba(180, 180, 180, 0.85);
+  border-color: #b4b4b4;
+  width: 9px;
+}
+
 .legend-swatch--wind::before {
   content: '→';
   position: absolute;
