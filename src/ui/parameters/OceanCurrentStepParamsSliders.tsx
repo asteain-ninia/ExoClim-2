@@ -116,7 +116,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-basin-neutral-width"
-        label="basin 中央 中立帯幅"
+        label="海洋盆中央の中立判定幅"
         unit="°"
         min={0}
         max={30}
@@ -128,7 +128,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-basin-min-width"
-        label="ストリームライン 盆 最小経度幅"
+        label="流線生成 海洋盆の最小経度幅"
         unit="°"
         min={5}
         max={120}
@@ -140,7 +140,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-equatorial-lat"
-        label="亜熱帯ジャイヤ 赤道側緯度"
+        label="亜熱帯循環 赤道側の緯度"
         unit="°"
         min={3}
         max={20}
@@ -152,7 +152,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-mid-lat"
-        label="亜熱帯ジャイヤ 中緯度反転緯度"
+        label="亜熱帯循環 中緯度反転の緯度"
         unit="°"
         min={20}
         max={50}
@@ -164,7 +164,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-polar-lat"
-        label="極ジャイヤ 極帯反転緯度"
+        label="極循環 極帯反転の緯度"
         unit="°"
         min={60}
         max={89}
@@ -176,7 +176,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-samples-per-edge"
-        label="ストリームライン 各エッジ サンプル点数"
+        label="流線サンプル点数（線の滑らかさ）"
         unit="点"
         min={4}
         max={60}
@@ -188,7 +188,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-curvature"
-        label="ストリームライン 曲げ量（中間点）"
+        label="流線カーブ量（中間点を膨らます）"
         unit="°"
         min={0}
         max={15}
@@ -200,7 +200,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-deflection-range"
-        label="陸地反発 影響半径（セル）"
+        label="陸地回避 影響範囲"
         unit="セル"
         min={0}
         max={15}
@@ -212,7 +212,7 @@ export function OceanCurrentStepParamsSliders() {
       />
       <Slider
         id="ocean-streamline-deflection-max"
-        label="陸地反発 最大変位量"
+        label="陸地回避 最大変位量"
         unit="°"
         min={0}
         max={10}
@@ -223,7 +223,7 @@ export function OceanCurrentStepParamsSliders() {
         onChange={(v) => setOceanCurrentParams({ streamlineMaxDeflectionDeg: v })}
       />
       <div className="param-toggle">
-        <span className="param-toggle__label">agent-tracing（赤道反流のみ、実験段階）</span>
+        <span className="param-toggle__label">agent 追跡モード（実験：赤道反流のみ）</span>
         <div className="param-toggle__buttons">
           <button
             type="button"
@@ -253,7 +253,7 @@ export function OceanCurrentStepParamsSliders() {
       </div>
       <Slider
         id="ocean-agent-base-speed"
-        label="agent 基本速度"
+        label="agent 進行速度（基本値）"
         unit="°/step"
         min={0.1}
         max={2}
@@ -264,7 +264,7 @@ export function OceanCurrentStepParamsSliders() {
         onChange={(v) => setOceanCurrentParams({ agentBaseSpeedDegPerStep: v })}
       />
       <div className="param-toggle">
-        <span className="param-toggle__label">ENSO 候補マスク（[§4.10]）</span>
+        <span className="param-toggle__label">ENSO 候補海域マスク（§4.10）</span>
         <div className="param-toggle__buttons">
           <button
             type="button"
@@ -294,7 +294,7 @@ export function OceanCurrentStepParamsSliders() {
       </div>
       <Slider
         id="ocean-enso-lat-range"
-        label="ENSO 候補 赤道緯度範囲"
+        label="ENSO 候補 緯度範囲（赤道±）"
         unit="°"
         min={3}
         max={20}
