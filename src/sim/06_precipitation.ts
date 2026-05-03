@@ -722,11 +722,31 @@ export function computePrecipitation(
           }
         }
 
+        // §4.x [P4-54] 熱帯乾季: lat 5-25° 陸地で「ITCZ 圏外 + 暖流wet なし +
+        // orographic windward なし」のとき dry にする。これがないと年中 60mm
+        // (normal) で driestMonth ≥ 60 → Af になり、Aw（サバナ）が出ない。
+        // Pasta WL#37 によれば「ITCZ が冬半球側に移ると亜熱帯高気圧が降りてきて
+        // 乾季を作る」のが Aw / Am の本質。
+        const isTropicalDrySeason =
+          cell.isLand &&
+          absLat >= 5 &&
+          absLat < 25 &&
+          !inITCZ &&
+          !inWarmWet &&
+          !inWindward &&
+          !isITCZCoastalOnshore;
+
         if (inITCZ && isWetCandidate) {
           labelRow[j] = 'very_wet';
         } else if (isWetCandidate) {
           labelRow[j] = 'wet';
         } else if (isITCZCoastalOnshore) {
+          labelRow[j] = 'wet';
+        } else if (inITCZ && absLat < 15) {
+          // [P4-54] ITCZ 圏内の対流性降水: 深熱帯（lat<15°）に限定。
+          // 暖流wet/orographic がなくとも 'wet'。lat 15° 以上は影響帯端で
+          // 雨量薄く normal のままにし、亜熱帯高気圧帯（25-35°）の dry を
+          // 食い潰さないようにする
           labelRow[j] = 'wet';
         } else if (
           cell.isLand &&
@@ -735,6 +755,8 @@ export function computePrecipitation(
         ) {
           labelRow[j] = 'dry';
         } else if (coldCurrentDry) {
+          labelRow[j] = 'dry';
+        } else if (isTropicalDrySeason) {
           labelRow[j] = 'dry';
         } else {
           labelRow[j] = 'normal';
