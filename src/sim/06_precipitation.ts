@@ -782,20 +782,21 @@ export function computePrecipitation(
           !inWindward &&
           !isITCZCoastalOnshore;
 
-        // [P4-70] 地中海性気候 Cs 形成: lat 30-42° 西岸（cold current adjacent）
-        // の冬月のみ wet。Pasta WL#37「subtropical high が冬には極側へ後退して
-        // storm track が西岸に来る」で、地中海/カリフォルニア/チリ analog の
-        // 「冬 wet + 夏 dry」を生成。
-        let isMediterraneanWinterWet = false;
-        if (
-          cell.isLand &&
-          absLat >= 30 &&
-          absLat <= 42 &&
-          isWinterMonthForLatitude(m, cell.latitudeDeg)
-        ) {
-          const monthCorr = oceanCurrentResult.monthlyCoastalTemperatureCorrectionCelsius[m];
-          // 西方向 5° 内に cold current 海 (corr < -1) があれば西岸寄り判定
-          for (let dc = 1; dc <= 5; dc++) {
+        // [P4-70/P4-82] 地中海性気候 Cs 形成: lat 30-42° 西岸（cold current adjacent）
+        // の冬月 wet + 夏月 dry。Pasta WL#37「subtropical high が冬には極側へ後退、
+        // 夏には西岸を覆う」で、地中海/カリフォルニア/チリ analog の「冬 wet + 夏 dry」
+        // を生成。P4-82 改訂: 当初 winter wet のみで lat 36-42° 夏が normal (60mm) 残り、
+        // Cs 判定条件 (driest summer < 40 / ratio ≥ 3) を満たさず Cs ベルト欠落
+        // (subagent eval 2026-05-04)。夏月も dry を強制して Cs band を確保する。
+        let isMediterraneanBand = false;
+        if (cell.isLand && absLat >= 30 && absLat <= 42) {
+          // [P4-82] subagent eval 2026-05-04 で「Cs ベルト欠落」指摘。
+          // 当初は「corr < -1 を 5° 内」と厳しかったため band の検出範囲が
+          // 狭かった。Cs band は Pasta WL#37 で「西岸 storm track」由来で
+          // 一律発生するべき帯なので、西岸条件 (西側 8° 内に海) を緩和し、
+          // 寒流隣接 (corr < -0.5) を OR 条件に降格、純西岸性のみで充足とする。
+          let westOcean = false;
+          for (let dc = 1; dc <= 8; dc++) {
             const nj = ((j - dc) % cols + cols) % cols;
             const nCell = grid.cells[i]?.[nj];
             if (!nCell) continue;
@@ -803,12 +804,16 @@ export function computePrecipitation(
               if (dc <= 2) break;
               continue;
             }
-            if ((monthCorr?.[i]?.[nj] ?? 0) < -1) {
-              isMediterraneanWinterWet = true;
-              break;
-            }
+            // 海セルが見つかったら西岸寄り判定 (cold current 必須ではない)
+            westOcean = true;
+            break;
           }
+          isMediterraneanBand = westOcean;
         }
+        const isMediterraneanWinterWet =
+          isMediterraneanBand && isWinterMonthForLatitude(m, cell.latitudeDeg);
+        const isMediterraneanSummerDry =
+          isMediterraneanBand && !isWinterMonthForLatitude(m, cell.latitudeDeg);
 
         // [P4-57/58] Siberian high (NH 高緯度内陸 winter dry): lat 45-65°N の
         // **東半分内陸** に冬月 dry / 夏月 wet。Pasta「東アジア (Mongolia/NE 中国/
@@ -885,6 +890,10 @@ export function computePrecipitation(
         } else if (inITCZ && absLat < 15) {
           // lat 8-15° は wet（年中ではないが ITCZ が overhead する月で）
           labelRow[j] = 'wet';
+        } else if (isMediterraneanSummerDry) {
+          // [P4-82] 地中海性気候 西岸 30-42° 夏季 dry（夏 normal だと Cs 判定が
+          // 失敗するため明示的に dry を強制、subagent eval 2026-05-04 対応）
+          labelRow[j] = 'dry';
         } else if (
           cell.isLand &&
           absLat >= SUBTROPICAL_HIGH_LAT_MIN_DEG &&

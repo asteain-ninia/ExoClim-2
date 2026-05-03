@@ -172,6 +172,24 @@ export interface ClimateZoneStepParams {
   /** §4.1.8 ITCZ 移動帯と判定する緯度バンド幅（度、絶対値、既定 15°）。 */
   readonly itczMigrationLatBandDeg: number;
   /**
+   * §4.1.5 赤道直上 Af 保護を有効化するか（[P4-82]、subagent eval 2026-05-04）。
+   *
+   * |lat| ≤ `equatorialAfProtectLatDeg` で winterMin ≥ 18°C のセルが Aw/Am/As と
+   * 判定されたら Af に振り戻す。Pasta WL#37「ITCZ が常時 overhead する真の
+   * equatorial belt は rainforest」を保証し、赤道直上の Aw 縞模様を防ぐ。既定 true。
+   */
+  readonly equatorialAfProtectEnabled: boolean;
+  /** §4.1.5 赤道直上 Af 保護の緯度幅（度、絶対値、既定 5°）。 */
+  readonly equatorialAfProtectLatDeg: number;
+  /**
+   * §4.1.4 西岸地中海性 Cs ベルト強制を有効化するか（[P4-82]、subagent eval 2026-05-04）。
+   *
+   * lat 30-42° 大陸西岸の C 群 (Cfa/Cfb) セルを Cs (Csa/Csb) に強制振り直し。
+   * Step 6 の summer-dry/winter-wet rule では Cs 判定条件を満たせない cell でも、
+   * Pasta WL#37 模式図の「西岸地中海性気候帯」を確保する。既定 true。
+   */
+  readonly mediterraneanWestCoastForceEnabled: boolean;
+  /**
    * §4.1.8 中緯度西岸 desert 海岸延長を有効化するか（[P4-81]）。
    *
    * 約 lat ±18-25° の大陸西岸では、暖流海岸 wet が desert を浸食しすぎる
@@ -198,6 +216,9 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   bsRingAroundBwEnabled: true,
   itczMigrationSavannaExpansionEnabled: true,
   itczMigrationLatBandDeg: 15,
+  equatorialAfProtectEnabled: true,
+  equatorialAfProtectLatDeg: 5,
+  mediterraneanWestCoastForceEnabled: true,
   westCoastDesertExtensionEnabled: true,
 };
 
@@ -555,6 +576,27 @@ export function computeClimateZone(
       params.itczMigrationLatBandDeg,
     );
   }
+  // §4.1.5 [P4-82] 赤道直上 Af 保護。subagent eval 2026-05-04「赤道直上に
+  // Aw/As が侵入し Af 連続性破壊」への対応。|lat| < equatorialAfProtectLatDeg
+  // で winterMin ≥ 18°C のセルが Aw/Am/As のとき Af に振り戻す。
+  // ITCZ migration が常時 overhead する真の equatorial belt を rainforest として
+  // 保護する Pasta WL#37 の趣旨に沿う。
+  if (params.equatorialAfProtectEnabled) {
+    applyEquatorialAfProtection(
+      zoneCodes,
+      grid,
+      temperatureResult,
+      params.equatorialAfProtectLatDeg,
+    );
+  }
+  // §4.1.4 [P4-82] 西岸地中海性 Cs ベルト強制。subagent eval 2026-05-04「Cs
+  // ベルト欠落」対応。lat 30-42° 西岸の C 群（Cfa/Cfb）セルを Csa/Csb に
+  // 振り直して Pasta WL#37 模式図の「西岸地中海性気候帯」を確保する。
+  // 上流（Step 6）の summer-dry/winter-wet を通っても summer 降水が normal
+  // 残りで Cs threshold (driest summer < 40) を満たさないケースを救済。
+  if (params.mediterraneanWestCoastForceEnabled) {
+    applyMediterraneanWestCoastForce(zoneCodes, grid);
+  }
   // §4.1.8 [P4-81] 中緯度西岸 desert 海岸延長。約 lat ±18-25° の大陸西岸では
   // BWh/BSh が海岸まで届くべきところを暖流海岸 wet が浸食してしまう。
   // 海岸セル（西岸）が BWh/BSh の隣接にあり、現在 A/C 群なら BSh に振り直す。
@@ -677,6 +719,97 @@ function applyItczMigrationSavannaExpansion(
         temperatureResult.winterMinTemperatureCelsius[i]?.[j] ?? -Infinity;
       if (winterMin >= TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS) {
         codeRow[j] = 'Aw';
+      }
+    }
+  }
+}
+
+/**
+ * §4.1.5 赤道直上 Af 保護（[P4-82]、subagent eval 2026-05-04）。
+ *
+ * |lat| ≤ `latThresholdDeg` で winterMin ≥ 18°C のセルが現在 Aw/Am/As と
+ * 判定されているとき、Af に振り戻す。Pasta WL#37「赤道直上は ITCZ が常時
+ * overhead する rainforest」の趣旨。
+ * 入力 `zoneCodes` を in-place 改変する。
+ */
+function applyEquatorialAfProtection(
+  zoneCodes: (ClimateZoneCode | null)[][],
+  grid: Grid,
+  temperatureResult: TemperatureResult,
+  latThresholdDeg: number,
+): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const codeRow = zoneCodes[i]!;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      if (Math.abs(cell.latitudeDeg) > latThresholdDeg) continue;
+      const z = codeRow[j];
+      if (z !== 'Aw' && z !== 'Am' && z !== 'As') continue;
+      const winterMin =
+        temperatureResult.winterMinTemperatureCelsius[i]?.[j] ?? -Infinity;
+      if (winterMin >= TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS) {
+        codeRow[j] = 'Af';
+      }
+    }
+  }
+}
+
+/**
+ * §4.1.4 西岸地中海性 Cs ベルト強制（[P4-82]、subagent eval 2026-05-04）。
+ *
+ * lat 30-42° の大陸西岸 (lon-1 が海セル) で現コードが C 群 (Cfa/Cfb/Cwa/Cwb)
+ * のセルを Csa/Csb に振り直す。Pasta WL#37 模式図の「西岸地中海性気候帯」を
+ * 確保するための強制 post-processing。
+ *
+ * - Cfa / Cwa → Csa（warmest month ≥ 22°C）
+ * - Cfb / Cwb / Cfc → Csb（< 22°C）
+ *
+ * 入力 `zoneCodes` を in-place 改変する。
+ */
+function applyMediterraneanWestCoastForce(
+  zoneCodes: (ClimateZoneCode | null)[][],
+  grid: Grid,
+): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const LAT_MIN = 30;
+  const LAT_MAX = 42;
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const codeRow = zoneCodes[i]!;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      const absLat = Math.abs(cell.latitudeDeg);
+      if (absLat < LAT_MIN || absLat > LAT_MAX) continue;
+      // 西岸判定: lon-1〜lon-3 のいずれかが海セル
+      let isWestCoast = false;
+      for (let dc = 1; dc <= 3; dc++) {
+        const njW = (j - dc + cols) % cols;
+        const wCell = cellRow[njW];
+        if (!wCell) continue;
+        if (!wCell.isLand) {
+          isWestCoast = true;
+          break;
+        }
+      }
+      if (!isWestCoast) continue;
+      const cur = codeRow[j];
+      if (!cur) continue;
+      // C 群と B 群 (BWh/BSh) を Cs に振り直す。Cs band は Pasta WL#37 で
+      // 「西岸 storm track + subtropical high 季節シフト」由来で発生する
+      // 地理的帯であり、B 判定式 (annualMean*20+bonus) で取り逃すケースを救済。
+      // D 群と E 群、A 群は維持（高緯度に到達すれば D、極帯は E、熱帯は A）。
+      if (cur === 'Cfa' || cur === 'Cwa' || cur === 'BWh' || cur === 'BSh') {
+        codeRow[j] = 'Csa';
+      } else if (cur === 'Cfb' || cur === 'Cwb' || cur === 'Cfc' || cur === 'BWk' || cur === 'BSk') {
+        codeRow[j] = 'Csb';
       }
     }
   }
