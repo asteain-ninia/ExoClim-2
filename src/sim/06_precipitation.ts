@@ -697,6 +697,31 @@ export function computePrecipitation(
         //   ITCZ + onshore海岸 → wet
         //   亜熱帯高気圧帯 (lat 25–35°、陸地) → dry
         //   それ以外 → normal
+        // §4.x [P4-53] 寒流隣接 dry 帯: lat 10-30° 西岸（cold current が
+        // adjacent ocean に発生する位置）の land は dry。Sahara / Atacama analog。
+        // 既存の subtropical high (25-35°) と組み合わせて lat 10-35° の
+        // west coast / interior が dry → BWh の必要条件 (annual precip 低) を満たす
+        let coldCurrentDry = false;
+        if (cell.isLand && absLat >= 10 && absLat <= 30) {
+          const monthCorr = oceanCurrentResult.monthlyCoastalTemperatureCorrectionCelsius[m];
+          // 4 近傍に cold current 海セル (correction < -2°C) があるか
+          const adjs: ReadonlyArray<readonly [number, number]> = [
+            [0, 1], [0, -1], [1, 0], [-1, 0], [0, 2], [0, -2],
+          ];
+          for (const [di, dj] of adjs) {
+            const ni = i + di;
+            if (ni < 0 || ni >= rows) continue;
+            const nj = ((j + dj) % cols + cols) % cols;
+            const nCell = grid.cells[ni]?.[nj];
+            if (!nCell || nCell.isLand) continue;
+            const corr = monthCorr?.[ni]?.[nj] ?? 0;
+            if (corr < -2) {
+              coldCurrentDry = true;
+              break;
+            }
+          }
+        }
+
         if (inITCZ && isWetCandidate) {
           labelRow[j] = 'very_wet';
         } else if (isWetCandidate) {
@@ -708,6 +733,8 @@ export function computePrecipitation(
           absLat >= SUBTROPICAL_HIGH_LAT_MIN_DEG &&
           absLat <= SUBTROPICAL_HIGH_LAT_MAX_DEG
         ) {
+          labelRow[j] = 'dry';
+        } else if (coldCurrentDry) {
           labelRow[j] = 'dry';
         } else {
           labelRow[j] = 'normal';
