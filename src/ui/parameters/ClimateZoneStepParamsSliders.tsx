@@ -197,6 +197,86 @@ export function ClimateZoneStepParamsSliders() {
         advanced
         onChange={(v) => setClimateZoneParams({ tropicalExtensionMinWinterMinCelsius: v })}
       />
+      <div className="param-toggle">
+        <span className="param-toggle__label">ITCZ 移動帯 savanna 拡張（[§4.1.8]）</span>
+        <div className="param-toggle__buttons">
+          <button
+            type="button"
+            className={
+              climateZoneParams.itczMigrationSavannaExpansionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() =>
+              setClimateZoneParams({ itczMigrationSavannaExpansionEnabled: true })
+            }
+            data-testid="climate-zone-itcz-savanna-on"
+          >
+            有効
+          </button>
+          <button
+            type="button"
+            className={
+              !climateZoneParams.itczMigrationSavannaExpansionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() =>
+              setClimateZoneParams({ itczMigrationSavannaExpansionEnabled: false })
+            }
+            data-testid="climate-zone-itcz-savanna-off"
+          >
+            無効
+          </button>
+        </div>
+      </div>
+      <Slider
+        id="climate-zone-itcz-migration-band"
+        label="ITCZ 移動帯 緯度バンド幅"
+        unit="°"
+        min={5}
+        max={25}
+        step={1}
+        precision={0}
+        value={climateZoneParams.itczMigrationLatBandDeg}
+        defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.itczMigrationLatBandDeg}
+        helpText="赤道帯近傍 |lat| ≤ X° の範囲で BWh / BSh のセルを Aw に振り戻す（既定 15°）。"
+        advanced
+        onChange={(v) => setClimateZoneParams({ itczMigrationLatBandDeg: v })}
+      />
+      <div className="param-toggle">
+        <span className="param-toggle__label">中緯度西岸 desert 海岸延長（[§4.1.8]）</span>
+        <div className="param-toggle__buttons">
+          <button
+            type="button"
+            className={
+              climateZoneParams.westCoastDesertExtensionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() =>
+              setClimateZoneParams({ westCoastDesertExtensionEnabled: true })
+            }
+            data-testid="climate-zone-westcoast-desert-on"
+          >
+            有効
+          </button>
+          <button
+            type="button"
+            className={
+              !climateZoneParams.westCoastDesertExtensionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() =>
+              setClimateZoneParams({ westCoastDesertExtensionEnabled: false })
+            }
+            data-testid="climate-zone-westcoast-desert-off"
+          >
+            無効
+          </button>
+        </div>
+      </div>
     </fieldset>
   );
 }

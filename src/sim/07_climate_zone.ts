@@ -159,6 +159,26 @@ export interface ClimateZoneStepParams {
    * 既定 true。無効化したい場合は false（A→BW の急変が現れる）。
    */
   readonly bsRingAroundBwEnabled: boolean;
+  /**
+   * §4.1.8 ITCZ 移動帯 savanna 拡張を有効化するか（[P4-81]）。
+   *
+   * 赤道帯近傍 (|lat| ≤ `itczMigrationLatBandDeg`) で `BWh` / `BSh` に
+   * 落ちたセルのうち、winterMin が A 群条件 (≥ 18°C) を満たし最雨月が
+   * 60 mm/月以上のセルを `Aw` (savanna) に振り戻す。Pasta は「ITCZ が
+   * 季節間を移動する範囲では赤道帯近傍の dry が縮小し savanna が拡大」
+   * と記述（[docs/spec/07_気候帯.md §4.1.8]）。既定 true。
+   */
+  readonly itczMigrationSavannaExpansionEnabled: boolean;
+  /** §4.1.8 ITCZ 移動帯と判定する緯度バンド幅（度、絶対値、既定 15°）。 */
+  readonly itczMigrationLatBandDeg: number;
+  /**
+   * §4.1.8 中緯度西岸 desert 海岸延長を有効化するか（[P4-81]）。
+   *
+   * 約 lat ±18-25° の大陸西岸では、暖流海岸 wet が desert を浸食しすぎる
+   * のを補正し、海岸セルが BWh / BSh の隣接にあれば BSh に振り直す。
+   * 完全な BWh 化はせず BSh 止まり（鋭い遷移を避ける）。既定 true。
+   */
+  readonly westCoastDesertExtensionEnabled: boolean;
 }
 
 export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
@@ -176,6 +196,9 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   tropicalExtensionMinAnnualMeanCelsius: 22,
   tropicalExtensionMinWinterMinCelsius: 10,
   bsRingAroundBwEnabled: true,
+  itczMigrationSavannaExpansionEnabled: true,
+  itczMigrationLatBandDeg: 15,
+  westCoastDesertExtensionEnabled: true,
 };
 
 /** 月別気温・降水量の集約結果。 */
@@ -520,6 +543,25 @@ export function computeClimateZone(
     rationale[i] = ratRow;
   }
 
+  // §4.1.8 [P4-81] ITCZ 移動帯 savanna 拡張。Pasta「ITCZ が季節間を移動する
+  // 範囲では赤道帯近傍の dry が縮小し savanna が拡大」。BWh/BSh で落ちた
+  // 赤道帯セルを Aw に振り戻す。BS リングより前に適用して、リング処理が
+  // 正しい A/B 境界を見るようにする。
+  if (params.itczMigrationSavannaExpansionEnabled) {
+    applyItczMigrationSavannaExpansion(
+      zoneCodes,
+      grid,
+      temperatureResult,
+      params.itczMigrationLatBandDeg,
+    );
+  }
+  // §4.1.8 [P4-81] 中緯度西岸 desert 海岸延長。約 lat ±18-25° の大陸西岸では
+  // BWh/BSh が海岸まで届くべきところを暖流海岸 wet が浸食してしまう。
+  // 海岸セル（西岸）が BWh/BSh の隣接にあり、現在 A/C 群なら BSh に振り直す。
+  if (params.westCoastDesertExtensionEnabled) {
+    applyWestCoastDesertExtension(zoneCodes, grid);
+  }
+
   // §4.x [P4-55] BS リング後処理: BW セルに隣接する非 B/E ゾーン（A/C/D）を
   // BS に置換してステップ気候の遷移帯を生成。Pasta WL#37 / 教科書的に
   // 「砂漠は必ずステップに囲まれる」ためで、ring がないと A → BW の急変が
@@ -600,6 +642,101 @@ function computeClimateClash(
     }
   }
   return { climateClashMask: mask, climateClashCount: count };
+}
+
+/**
+ * §4.1.8 ITCZ 移動帯 savanna 拡張（[P4-81]）。
+ *
+ * 赤道帯近傍 (|lat| ≤ `latBandDeg`) で `BWh` / `BSh` に落ちたセルのうち、
+ * winterMin が A 群条件 (≥ `TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS` = 18°C)
+ * を満たすセルを `Aw` に振り戻す（Pasta 「rainforest は年中高雨量を要するため
+ * 拡張しない」に従い、Af/Am ではなく Aw 一律）。
+ *
+ * temperatureResult.winterMinTemperatureCelsius を直接読んで判定する。
+ * 入力 `zoneCodes` を in-place 改変する。
+ */
+function applyItczMigrationSavannaExpansion(
+  zoneCodes: (ClimateZoneCode | null)[][],
+  grid: Grid,
+  temperatureResult: TemperatureResult,
+  latBandDeg: number,
+): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const codeRow = zoneCodes[i]!;
+    for (let j = 0; j < cols; j++) {
+      const z = codeRow[j];
+      if (z !== 'BWh' && z !== 'BSh') continue;
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      if (Math.abs(cell.latitudeDeg) > latBandDeg) continue;
+      const winterMin =
+        temperatureResult.winterMinTemperatureCelsius[i]?.[j] ?? -Infinity;
+      if (winterMin >= TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS) {
+        codeRow[j] = 'Aw';
+      }
+    }
+  }
+}
+
+/**
+ * §4.1.8 中緯度西岸 desert 海岸延長（[P4-81]）。
+ *
+ * 約 lat ±18-25° の大陸西岸で、内陸が BWh/BSh なのに海岸セルが
+ * A/C 群（暖流海岸 wet 由来）になっている場合、海岸セルを BSh に
+ * 振り直して desert が海岸まで届くようにする。完全な BWh 化はしない
+ * （急変を避ける）。
+ *
+ * 西岸の判定: 当該セル j の隣接 j-1 が海セル（lon -1°側）。
+ * 内陸 BWh/BSh の判定: j+1, j+2 のいずれかが BWh/BSh かつ陸セル。
+ * 入力 `zoneCodes` を in-place 改変する。
+ */
+function applyWestCoastDesertExtension(
+  zoneCodes: (ClimateZoneCode | null)[][],
+  grid: Grid,
+): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const LAT_MIN = 18;
+  const LAT_MAX = 25;
+  // 順行/逆行は影響しない（西岸は地形上の概念）。lon -1 が海かどうかで判定。
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const codeRow = zoneCodes[i]!;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      const absLat = Math.abs(cell.latitudeDeg);
+      if (absLat < LAT_MIN || absLat > LAT_MAX) continue;
+      // 西岸判定: lon-1 セルが海
+      const jWest = (j - 1 + cols) % cols;
+      const westCell = cellRow[jWest];
+      if (!westCell || westCell.isLand) continue;
+      // 内陸（東 1-2 セル）が BW/BS hot
+      let inlandIsHotArid = false;
+      for (let dj = 1; dj <= 2; dj++) {
+        const ji = (j + dj) % cols;
+        const inlandCell = cellRow[ji];
+        if (!inlandCell || !inlandCell.isLand) continue;
+        const inlandCode = codeRow[ji];
+        if (inlandCode === 'BWh' || inlandCode === 'BSh') {
+          inlandIsHotArid = true;
+          break;
+        }
+      }
+      if (!inlandIsHotArid) continue;
+      // 現コードが A 群 / C 群 なら BSh に振り直し
+      const cur = codeRow[j];
+      if (!cur) continue;
+      if (cur.startsWith('A') || cur.startsWith('C')) {
+        codeRow[j] = 'BSh';
+      }
+    }
+  }
 }
 
 /**
