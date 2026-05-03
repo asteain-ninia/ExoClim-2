@@ -4,7 +4,12 @@
 
 import { useEffect, useRef } from 'react';
 import {
+  applySnapshot,
   connectStoresToBridge,
+  isValidSnapshot,
+  loadParamsFromLocalStorage,
+  saveParamsToLocalStorage,
+  serializeParams,
   useNotificationsStore,
   useParamsStore,
   useResultsStore,
@@ -85,6 +90,32 @@ export function App() {
     return () => {
       dispose();
       bridge.dispose();
+    };
+  }, []);
+
+  // [P4-64] U10 localStorage 自動保存:
+  // (1) 起動時に保存済み snapshot があれば復元
+  // (2) params 変更を debounce 1s で localStorage に保存
+  useEffect(() => {
+    const saved = loadParamsFromLocalStorage();
+    if (saved && isValidSnapshot(saved)) {
+      try {
+        applySnapshot(useParamsStore, saved);
+      } catch {
+        // 形式不正で reject されたら無視（既定値で起動）
+      }
+    }
+    // 永続化監視: params の変更 1s debounce で保存
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = useParamsStore.subscribe((state) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        saveParamsToLocalStorage(serializeParams(state));
+      }, 1000);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
     };
   }, []);
 

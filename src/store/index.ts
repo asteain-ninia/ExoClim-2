@@ -30,4 +30,12 @@ export type {
 export { createNotificationsStore, useNotificationsStore } from './notifications';
 
 export type { ParamsSnapshot, ParamsSnapshotPayload } from './settingsIo';
-export { applySnapshot, isValidSnapshot, serializeParams } from './settingsIo';
+export {
+  applySnapshot,
+  clearParamsLocalStorage,
+  isValidSnapshot,
+  loadParamsFromLocalStorage,
+  PARAMS_LOCAL_STORAGE_KEY,
+  saveParamsToLocalStorage,
+  serializeParams,
+} from './settingsIo';

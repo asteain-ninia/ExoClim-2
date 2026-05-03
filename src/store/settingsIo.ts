@@ -139,3 +139,47 @@ export function applySnapshot(
     );
   }
 }
+
+// ----- localStorage 自動保存 ([現状.md §6 U10]、P4-64) -----
+
+/** localStorage に snapshot を書き込む key（versioned）。 */
+export const PARAMS_LOCAL_STORAGE_KEY = 'exoclim-params-v1';
+
+/**
+ * 現在の params を localStorage に保存する。失敗しても例外は投げない
+ * （プライベートモード / 容量超過に備える）。
+ */
+export function saveParamsToLocalStorage(snapshot: ParamsSnapshot): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(PARAMS_LOCAL_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * localStorage から snapshot を復元する。読めない / パース失敗 / 形式不正
+ * の場合は null を返す。
+ */
+export function loadParamsFromLocalStorage(): ParamsSnapshot | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(PARAMS_LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    return isValidSnapshot(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** localStorage の保存をクリアする（テスト / ユーザ操作 reset 用）。 */
+export function clearParamsLocalStorage(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(PARAMS_LOCAL_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
