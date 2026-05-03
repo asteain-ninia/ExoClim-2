@@ -171,6 +171,27 @@ body {
   border-color: #d8e6f4;
 }
 
+.legend-swatch--upwelling {
+  background: rgba(32, 178, 200, 0.55);
+  border-color: #20b2c8;
+}
+
+.legend-swatch--collision-eq {
+  background: #ffd040;
+  border-color: #c08010;
+  border-radius: 50%;
+}
+.legend-swatch--collision-polar {
+  background: #c060ff;
+  border-color: #6020a0;
+  border-radius: 50%;
+}
+
+.legend-swatch--enso {
+  background: rgba(220, 100, 60, 0.45);
+  border-color: #dc6440;
+}
+
 .legend-swatch--stream-warm {
   background: #ff7040;
   border-color: #ff5020;

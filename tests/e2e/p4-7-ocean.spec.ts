@@ -59,7 +59,7 @@ test.describe('P4-7: Step 3 海流', () => {
     await page.waitForTimeout(900);
   });
 
-  test('Step 3 海流パネル（5 スライダー）が表示される', async ({ page }) => {
+  test('Step 3 海流パネル（13 スライダー + 寒流延長 / ENSO トグル）が表示される', async ({ page }) => {
     await expect(page.getByTestId('param-group-ocean-current')).toBeVisible();
     for (const id of [
       'slider-ocean-warm-rise',
@@ -67,9 +67,22 @@ test.describe('P4-7: Step 3 海流', () => {
       'slider-ocean-influence-range',
       'slider-ocean-sea-ice-lat',
       'slider-ocean-basin-neutral-width',
+      'slider-ocean-streamline-basin-min-width',
+      'slider-ocean-streamline-equatorial-lat',
+      'slider-ocean-streamline-mid-lat',
+      'slider-ocean-streamline-polar-lat',
+      'slider-ocean-streamline-samples-per-edge',
+      'slider-ocean-cold-extension-min-lat',
+      'slider-ocean-cold-extension-proximity',
+      'slider-ocean-enso-lat-range',
     ]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
+    // 寒流延長 + ENSO 有効/無効トグル
+    await expect(page.getByTestId('ocean-cold-extension-on')).toBeVisible();
+    await expect(page.getByTestId('ocean-cold-extension-off')).toBeVisible();
+    await expect(page.getByTestId('ocean-enso-on')).toBeVisible();
+    await expect(page.getByTestId('ocean-enso-off')).toBeVisible();
   });
 
   test('凡例に「海流」「海氷」トグルが表示され、既定で ON', async ({ page }) => {
@@ -126,5 +139,55 @@ test.describe('P4-7: Step 3 海流', () => {
     await page.waitForTimeout(150);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
+  });
+
+  test('海流衝突点 トグルが表示され、既定 ON、OFF にすると描画が変わる', async ({
+    page,
+  }) => {
+    await expect(page.getByTestId('legend-collision-points')).toBeVisible();
+    await expect(page.getByTestId('legend-collision-points')).toBeChecked();
+    const before = await canvasFingerprint(page);
+    await page.getByTestId('legend-collision-points').uncheck();
+    await page.waitForTimeout(200);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
+
+  test('ENSO 候補マスク トグルが表示され、既定 OFF、ON にすると描画が変わる（[§4.10]）', async ({
+    page,
+  }) => {
+    await expect(page.getByTestId('legend-enso-candidate')).toBeVisible();
+    await expect(page.getByTestId('legend-enso-candidate')).not.toBeChecked();
+    const before = await canvasFingerprint(page);
+    await page.getByTestId('legend-enso-candidate').check();
+    await page.waitForTimeout(200);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
+
+  test('沿岸湧昇マスク トグルが表示され、既定 OFF、ON にすると描画が変わる', async ({
+    page,
+  }) => {
+    // 表示トグルに沿岸湧昇項目が追加されている（[docs/spec/02_風帯.md] / [docs/spec/03_海流.md §既知の未対応事項]）
+    await expect(page.getByTestId('legend-coastal-upwelling')).toBeVisible();
+    await expect(page.getByTestId('legend-coastal-upwelling')).not.toBeChecked();
+    const before = await canvasFingerprint(page);
+    await page.getByTestId('legend-coastal-upwelling').check();
+    await page.waitForTimeout(200);
+    const after = await canvasFingerprint(page);
+    expect(after).not.toBe(before);
+  });
+
+  test('月別表示にすると寒流沿い東岸海氷延長で描画が変わる（[§4.7]、Worldbuilder\'s Log #28）', async ({
+    page,
+  }) => {
+    // 既定では年平均（'annual'）表示。buildSeaIceBitmap は年平均では緯度しきい値のみを
+    // 使い、月別では oceanCurrent.monthlySeaIceMask を読み取る。1 月（NH 冬、index 0）に
+    // 切替えると寒流沿い東岸延長が表示され、年平均と Canvas 指紋が変わる。
+    const annualFingerprint = await canvasFingerprint(page);
+    await page.getByTestId('season-0').click();
+    await page.waitForTimeout(900);
+    const janFingerprint = await canvasFingerprint(page);
+    expect(janFingerprint).not.toBe(annualFingerprint);
   });
 });

@@ -16,6 +16,7 @@ import type {
   AirflowResult,
   Cell,
   ClimateZoneResult,
+  CollisionPoint,
   CurrentStreamline,
   Grid,
   GridMap,
@@ -699,18 +700,23 @@ const SEA_ICE_MAX_ALPHA = 217; // ~85%
 /**
  * 海氷オーバーレイをオフスクリーン Canvas に構築する。
  *
- * `OceanCurrentResult.monthlySeaIceMask` は二値（しきい値超過なら true）だが、表示は
- * 「特定緯度でスパーンと切れる」のを避けるため、UI 側でしきい値前後 SEA_ICE_FADE_WIDTH_DEG の
- * 範囲に α 線形フェードをかける。具体的には:
- *   |lat| < threshold - fade: α = 0
- *   threshold - fade ≤ |lat| ≤ threshold + fade: α = 線形補間 [0, 1]
- *   |lat| > threshold + fade: α = 1
+ * `OceanCurrentResult.monthlySeaIceMask` は二値だが、表示は「特定緯度でスパーンと切れる」
+ * のを避けるため、UI 側でしきい値前後 SEA_ICE_FADE_WIDTH_DEG の範囲に α 線形フェードをかける:
+ *   - 基本配置（|lat| > threshold-fade）: 線形フェード [0, 1] → 1
+ *   - 寒流沿い東岸延長（|lat| ≤ threshold-fade で mask=true、[docs/spec/03_海流.md §4.7]）:
+ *     full alpha（緯度フェードは非対称領域なので適用しない）
  * 海洋セル (`!cell.isLand`) のみを対象とする。
  *
- * 二値 mask 自体は Step 5 気温（雪氷フィードバック）が消費するため、計算層では維持。
+ * 二値 mask は Step 5 気温（雪氷フィードバック）が消費するため、計算層では維持。
  * UI 側で表示を滑らかにするのは凡例と同等の責務（[要件定義書.md §2.3.2]）。
+ *
+ * `mask` を null で渡すと「緯度しきい値のみ」（年平均など季節非依存表示）に縮退する。
  */
-function buildSeaIceBitmap(grid: Grid, thresholdDeg: number): HTMLCanvasElement {
+function buildSeaIceBitmap(
+  grid: Grid,
+  mask: GridMap<boolean> | null,
+  thresholdDeg: number,
+): HTMLCanvasElement {
   const cols = grid.longitudeCount;
   const rows = grid.latitudeCount;
   const off = document.createElement('canvas');
@@ -728,18 +734,121 @@ function buildSeaIceBitmap(grid: Grid, thresholdDeg: number): HTMLCanvasElement 
   for (let r = 0; r < rows; r++) {
     const cellRow = grid.cells[r];
     if (!cellRow) continue;
+    const maskRow = mask?.[r];
     const imageY = rows - 1 - r;
     for (let c = 0; c < cols; c++) {
       const cell = cellRow[c];
       if (!cell || cell.isLand) continue;
       const absLat = Math.abs(cell.latitudeDeg);
-      if (absLat <= fadeStart) continue;
-      const t = absLat >= fadeEnd ? 1 : (absLat - fadeStart) / (fadeEnd - fadeStart);
+      const inBasicFadeRange = absLat > fadeStart;
+      const isExtensionCell = !inBasicFadeRange && maskRow?.[c] === true;
+      if (!inBasicFadeRange && !isExtensionCell) continue;
+      // mask が指定されている場合、基本配置帯でも実マスクを尊重（陸接続などで非氷化されるケースに対応）
+      if (inBasicFadeRange && maskRow && maskRow[c] !== true) continue;
       const offset = (imageY * cols + c) * 4;
       data[offset] = 230;
       data[offset + 1] = 240;
       data[offset + 2] = 250;
-      data[offset + 3] = Math.round(t * SEA_ICE_MAX_ALPHA);
+      if (isExtensionCell) {
+        data[offset + 3] = SEA_ICE_MAX_ALPHA;
+      } else {
+        const t = absLat >= fadeEnd ? 1 : (absLat - fadeStart) / (fadeEnd - fadeStart);
+        data[offset + 3] = Math.round(t * SEA_ICE_MAX_ALPHA);
+      }
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
+/** 沿岸湧昇マスクオーバーレイの最大不透明度（255 中、~55%）。 */
+const COASTAL_UPWELLING_MAX_ALPHA = 140;
+
+/** ENSO 候補マスクオーバーレイの最大不透明度（255 中、~45%、診断的なので湧昇より控えめ）。 */
+const ENSO_CANDIDATE_MAX_ALPHA = 115;
+
+/**
+ * ENSO ダイポール候補マスクオーバーレイをオフスクリーン Canvas に構築する
+ * （[docs/spec/03_海流.md §4.10]）。
+ *
+ * 「東西を陸地に挟まれた赤道付近の海域」を温色（オレンジ寄り）で塗る。Pasta は El Niño /
+ * La Niña の振動を simulate しないため候補海域マスクのみ。半透明で重畳して、地形・海流
+ * との関係を読み取れるようにする。
+ */
+function buildEnsoCandidateBitmap(
+  grid: Grid,
+  mask: GridMap<boolean>,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const maskRow = mask[r];
+    const cellRow = grid.cells[r];
+    if (!maskRow || !cellRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      if (maskRow[c] !== true) continue;
+      const cell = cellRow[c];
+      if (!cell || cell.isLand) continue;
+      const offset = (imageY * cols + c) * 4;
+      data[offset] = 220;
+      data[offset + 1] = 100;
+      data[offset + 2] = 60;
+      data[offset + 3] = ENSO_CANDIDATE_MAX_ALPHA;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
+/**
+ * 沿岸湧昇マスクオーバーレイをオフスクリーン Canvas に構築する
+ * （[docs/spec/02_風帯.md] / [docs/spec/03_海流.md §既知の未対応事項]）。
+ *
+ * Step 2 風帯が出力する `WindBeltResult.monthlyCoastalUpwellingMask` を per-cell に塗る。
+ * 寒流強化要因として可視化する候補だったマスク（[現状.md §既知の未対応事項]）。
+ * 色は深いシアン（湧昇の冷水・栄養塩イメージ）。
+ */
+function buildCoastalUpwellingBitmap(
+  grid: Grid,
+  mask: GridMap<boolean>,
+): HTMLCanvasElement {
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  for (let r = 0; r < rows; r++) {
+    const maskRow = mask[r];
+    const cellRow = grid.cells[r];
+    if (!maskRow || !cellRow) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      if (maskRow[c] !== true) continue;
+      const cell = cellRow[c];
+      if (!cell || cell.isLand) continue;
+      const offset = (imageY * cols + c) * 4;
+      data[offset] = 32;
+      data[offset + 1] = 178;
+      data[offset + 2] = 200;
+      data[offset + 3] = COASTAL_UPWELLING_MAX_ALPHA;
     }
   }
 
@@ -1068,6 +1177,37 @@ function drawCurrentStreamlines(
   }
 }
 
+/** 衝突点を 3 オフセットで丸マーカーとして描画する（[docs/spec/03_海流.md §4.5 / §4.6]）。
+ *  - equatorial_current: 黄色（暖流分岐の起点、赤道流→西岸境界流）
+ *  - polar_current: 紫色（極流が陸に衝突して終端）
+ */
+function drawCollisionPoints(
+  ctx: CanvasRenderingContext2D,
+  collisions: ReadonlyArray<CollisionPoint>,
+  normPanPx: number,
+): void {
+  for (const point of collisions) {
+    const fillStyle = point.type === 'equatorial_current' ? '#ffd040' : '#c060ff';
+    ctx.fillStyle = fillStyle;
+    ctx.strokeStyle = '#202028';
+    ctx.lineWidth = 1;
+    for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+      const { x, y } = projectRaw(
+        point.position.latitudeDeg,
+        point.position.longitudeDeg,
+        VIEWPORT,
+        drawOffset,
+      );
+      // 画面外（マージン込み）はスキップ（[§6.2.2] 単一サンプルなので margin は半径相当の余白でよい）
+      if (x < -10 || x > CANVAS_WIDTH_PX + 10) continue;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+}
+
 /** ITCZ 中心線をストロークする。3 オフセットで循環描画し、隣接インスタンス間も連結する。 */
 function drawCenterLine(
   ctx: CanvasRenderingContext2D,
@@ -1094,6 +1234,8 @@ function drawMap(
   terrainBitmap: HTMLCanvasElement | null,
   oceanCurrentBitmap: HTMLCanvasElement | null,
   seaIceBitmap: HTMLCanvasElement | null,
+  coastalUpwellingBitmap: HTMLCanvasElement | null,
+  ensoCandidateBitmap: HTMLCanvasElement | null,
   pressureAnomalyBitmap: HTMLCanvasElement | null,
   temperatureBitmap: HTMLCanvasElement | null,
   precipitationBitmap: HTMLCanvasElement | null,
@@ -1105,6 +1247,7 @@ function drawMap(
   pressureCenters: ReadonlyArray<PressureCenter> | null,
   isotherms: ReadonlyArray<IsothermLine> | null,
   oceanStreamlines: ReadonlyArray<CurrentStreamline> | null,
+  collisionPoints: ReadonlyArray<CollisionPoint> | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -1138,6 +1281,14 @@ function drawMap(
   if (legendVisibility.climateZones && climateZoneBitmap) {
     drawOverlayBitmap(ctx, climateZoneBitmap, norm);
   }
+  // 沿岸湧昇マスク（陸海の上、海氷の下、シアン半透明）
+  if (legendVisibility.coastalUpwelling && coastalUpwellingBitmap) {
+    drawOverlayBitmap(ctx, coastalUpwellingBitmap, norm);
+  }
+  // ENSO 候補マスク（陸海の上、海氷の下、温色半透明）— 沿岸湧昇と並行する診断 overlay
+  if (legendVisibility.ensoCandidateMask && ensoCandidateBitmap) {
+    drawOverlayBitmap(ctx, ensoCandidateBitmap, norm);
+  }
   // 海氷は最後に陸海の上にかぶせる（白で覆う）。
   if (legendVisibility.seaIce && seaIceBitmap) {
     drawOverlayBitmap(ctx, seaIceBitmap, norm);
@@ -1154,6 +1305,10 @@ function drawMap(
   // 海流ストリームライン（[docs/spec/03_海流.md §4.1〜§4.5]）— grid 線の上、矢印の前
   if (legendVisibility.oceanStreamlines && oceanStreamlines && oceanStreamlines.length > 0) {
     drawCurrentStreamlines(ctx, oceanStreamlines, norm);
+  }
+  // 海流衝突点マーカー（[docs/spec/03_海流.md §4.5 / §4.6]）— streamline の上に乗せて視認性確保
+  if (legendVisibility.collisionPoints && collisionPoints && collisionPoints.length > 0) {
+    drawCollisionPoints(ctx, collisionPoints, norm);
   }
   if (legendVisibility.windVectors && windField && grid) {
     drawWindVectors(ctx, windField, grid, norm);
@@ -1213,10 +1368,31 @@ export function MapCanvas() {
         : null,
     [oceanCurrent, grid, oceanWarmMaxRise, oceanColdMaxDrop],
   );
-  const seaIceBitmap = useMemo(
-    () => (grid ? buildSeaIceBitmap(grid, seaIceThresholdDeg) : null),
-    [grid, seaIceThresholdDeg],
-  );
+  const seaIceBitmap = useMemo(() => {
+    if (!grid) return null;
+    // 季節非依存（年平均）では実マスクを使わず緯度しきい値の対称表示で従来挙動を維持。
+    // 月別表示時は monthlySeaIceMask[monthIndex] を使い、寒流沿い東岸延長（[§4.7]）を反映する。
+    const mask =
+      oceanCurrent && currentSeason !== 'annual'
+        ? oceanCurrent.monthlySeaIceMask[currentSeason] ?? null
+        : null;
+    return buildSeaIceBitmap(grid, mask, seaIceThresholdDeg);
+  }, [grid, oceanCurrent, currentSeason, seaIceThresholdDeg]);
+
+  // 沿岸湧昇マスクビットマップ（windBelt.monthlyCoastalUpwellingMask 依存）
+  const coastalUpwellingBitmap = useMemo(() => {
+    if (!grid || !windBelt) return null;
+    const monthIndex = currentSeason === 'annual' ? 0 : currentSeason;
+    const mask = windBelt.monthlyCoastalUpwellingMask[monthIndex];
+    if (!mask) return null;
+    return buildCoastalUpwellingBitmap(grid, mask);
+  }, [grid, windBelt, currentSeason]);
+
+  // ENSO 候補マスクビットマップ（oceanCurrent.ensoDipoleCandidateMask 依存、季節非依存）
+  const ensoCandidateBitmap = useMemo(() => {
+    if (!grid || !oceanCurrent) return null;
+    return buildEnsoCandidateBitmap(grid, oceanCurrent.ensoDipoleCandidateMask);
+  }, [grid, oceanCurrent]);
 
   // 圧力 anomaly ビットマップ（airflow + currentSeason 依存）
   const pressureAnomalyBitmap = useMemo(() => {
@@ -1251,6 +1427,13 @@ export function MapCanvas() {
     if (!oceanCurrent) return null;
     const monthIndex = currentSeason === 'annual' ? 0 : currentSeason;
     return oceanCurrent.monthlyStreamlines[monthIndex] ?? null;
+  }, [oceanCurrent, currentSeason]);
+
+  // 海流衝突点（oceanCurrent + currentSeason 依存、現状は月別差なし）。
+  const collisionPointsForSeason = useMemo<ReadonlyArray<CollisionPoint> | null>(() => {
+    if (!oceanCurrent) return null;
+    const monthIndex = currentSeason === 'annual' ? 0 : currentSeason;
+    return oceanCurrent.monthlyCollisionPoints[monthIndex] ?? null;
   }, [oceanCurrent, currentSeason]);
 
   // 等温線（temperature + currentSeason 依存）
@@ -1419,6 +1602,8 @@ export function MapCanvas() {
       terrainBitmap,
       oceanCurrentBitmap,
       seaIceBitmap,
+      coastalUpwellingBitmap,
+      ensoCandidateBitmap,
       pressureAnomalyBitmap,
       temperatureBitmap,
       precipitationBitmap,
@@ -1430,6 +1615,7 @@ export function MapCanvas() {
       pressureCenters,
       isothermsForSeason,
       oceanStreamlinesForSeason,
+      collisionPointsForSeason,
       grid,
       legendVisibility,
     );
@@ -1438,6 +1624,8 @@ export function MapCanvas() {
     terrainBitmap,
     oceanCurrentBitmap,
     seaIceBitmap,
+    coastalUpwellingBitmap,
+    ensoCandidateBitmap,
     pressureAnomalyBitmap,
     temperatureBitmap,
     precipitationBitmap,
@@ -1449,6 +1637,7 @@ export function MapCanvas() {
     pressureCenters,
     isothermsForSeason,
     oceanStreamlinesForSeason,
+    collisionPointsForSeason,
     grid,
     legendVisibility,
   ]);

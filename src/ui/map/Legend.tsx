@@ -84,12 +84,49 @@ export function Legend() {
           <label>
             <input
               type="checkbox"
+              checked={legendVisibility.collisionPoints}
+              onChange={(e) => setLegendVisibility({ collisionPoints: e.target.checked })}
+              data-testid="legend-collision-points"
+            />
+            <span className="legend-swatch legend-swatch--collision-eq" aria-hidden="true" />
+            <span className="legend-swatch legend-swatch--collision-polar" aria-hidden="true" />
+            海流衝突点（Step 3、赤道流黄 / 極流紫）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
               checked={legendVisibility.seaIce}
               onChange={(e) => setLegendVisibility({ seaIce: e.target.checked })}
               data-testid="legend-sea-ice"
             />
             <span className="legend-swatch legend-swatch--sea-ice" aria-hidden="true" />
-            海氷（Step 3、|lat|＞しきい値）
+            海氷（Step 3、|lat|＞しきい値 + 冬季東岸延長）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.coastalUpwelling}
+              onChange={(e) => setLegendVisibility({ coastalUpwelling: e.target.checked })}
+              data-testid="legend-coastal-upwelling"
+            />
+            <span className="legend-swatch legend-swatch--upwelling" aria-hidden="true" />
+            沿岸湧昇（Step 2、寒流強化要因）
+          </label>
+        </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.ensoCandidateMask}
+              onChange={(e) => setLegendVisibility({ ensoCandidateMask: e.target.checked })}
+              data-testid="legend-enso-candidate"
+            />
+            <span className="legend-swatch legend-swatch--enso" aria-hidden="true" />
+            ENSO 候補海域（Step 3、§4.10、診断）
           </label>
         </li>
         <li>

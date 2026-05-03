@@ -33,8 +33,17 @@ export interface LegendVisibility {
   readonly oceanCurrents: boolean;
   /** Step 3 海流のストリームライン（流線）表示トグル（[docs/spec/03_海流.md §4.1〜§4.5]）。 */
   readonly oceanStreamlines: boolean;
+  /** Step 3 海流の衝突点マーカー（赤道流 / 極流）表示トグル（[docs/spec/03_海流.md §4.5 / §4.6]）。 */
+  readonly collisionPoints: boolean;
   /** Step 3 海流の海氷マスクの表示トグル。 */
   readonly seaIce: boolean;
+  /**
+   * Step 2 風帯が出力する沿岸湧昇マスク（[docs/spec/02_風帯.md] / [src/sim/02_wind_belt.ts]）の
+   * 表示トグル。寒流強化要因として可視化（[docs/spec/03_海流.md §既知の未対応事項]）。
+   */
+  readonly coastalUpwelling: boolean;
+  /** Step 3 海流の ENSO ダイポール候補マスク（[docs/spec/03_海流.md §4.10]）の表示トグル。 */
+  readonly ensoCandidateMask: boolean;
   /** Step 4 気流の最終地表風ベクトル overlay の表示トグル（ON にすると Step 2 矢印を置換）。 */
   readonly finalWindVectors: boolean;
   /** Step 4 気流の圧力 anomaly ヒートマップ表示トグル。 */
@@ -89,7 +98,10 @@ const INITIAL_UI_STATE: UIState = {
     windVectors: false,    // Step 2 卓越風（既定 OFF: Step 4 final wind を既定で表示）
     oceanCurrents: true,
     oceanStreamlines: true,
+    collisionPoints: true,  // 衝突点（既定 ON、地形を阻害しない単発マーカー）
     seaIce: true,
+    coastalUpwelling: false, // 沿岸湧昇マスク（既定 OFF、地形・海流が見えなくなるため利用者が必要時に ON）
+    ensoCandidateMask: false, // ENSO ダイポール候補マスク（既定 OFF、診断的情報のため利用者が必要時に ON）
     finalWindVectors: true,  // Step 4 final wind（既定 ON）
     pressureAnomaly: false,  // 圧力 anomaly ヒートマップ（既定 OFF、利用者が必要時に ON）
     pressureCenters: true,   // 気圧中心 H / L マーカー（既定 ON、地形と相関した anomaly 中心を直感化）

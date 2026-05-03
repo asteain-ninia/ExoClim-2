@@ -94,6 +94,47 @@ export function ClimateZoneStepParamsSliders() {
           </button>
         </div>
       </div>
+      <div className="param-toggle">
+        <span className="param-toggle__label">B → D 振り戻し（[§4.1.7]）</span>
+        <div className="param-toggle__buttons">
+          <button
+            type="button"
+            className={
+              climateZoneParams.aridReclassToDEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() => setClimateZoneParams({ aridReclassToDEnabled: true })}
+            data-testid="climate-zone-reclass-on"
+          >
+            有効
+          </button>
+          <button
+            type="button"
+            className={
+              !climateZoneParams.aridReclassToDEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() => setClimateZoneParams({ aridReclassToDEnabled: false })}
+            data-testid="climate-zone-reclass-off"
+          >
+            無効
+          </button>
+        </div>
+      </div>
+      <Slider
+        id="climate-zone-reclass-max-temp"
+        label="B → D 振り戻し 年平均気温しきい値"
+        unit="°C"
+        min={-5}
+        max={20}
+        step={0.5}
+        precision={1}
+        value={climateZoneParams.aridReclassToDMaxAnnualTempCelsius}
+        defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.aridReclassToDMaxAnnualTempCelsius}
+        onChange={(v) => setClimateZoneParams({ aridReclassToDMaxAnnualTempCelsius: v })}
+      />
     </fieldset>
   );
 }

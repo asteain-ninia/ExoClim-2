@@ -382,6 +382,46 @@ describe('sim/07_climate_zone: パラメータ依存', () => {
     expect(highB).toBeLessThanOrEqual(lowB);
   });
 
+  it('§4.1.7 B → D 振り戻し: 寒冷地の B 候補（年平均 ≤ 7°C, winterMin < 0, 年降水量 < arid）が D に振り戻される', () => {
+    const coldDryAgg = makeAgg({
+      monthlyT: [-15, -10, -5, 0, 5, 10, 12, 10, 5, 0, -5, -10],
+      monthlyP: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], // 年 120mm（dry）
+    });
+    // annualMean = -1.0, winterMin = -15, summerMax = 12 → D 候補かつ B 候補
+    const enabled = __internals.classifyCell(coldDryAgg, DEFAULT_CLIMATE_ZONE_STEP_PARAMS);
+    expect(enabled.code.startsWith('D')).toBe(true);
+    // 無効化すると B（BWk または Bsk）になる
+    const disabled = __internals.classifyCell(coldDryAgg, {
+      ...DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
+      aridReclassToDEnabled: false,
+    });
+    expect(disabled.code.startsWith('B')).toBe(true);
+  });
+
+  it('§4.1.7: 暖かい B 候補（年平均 > しきい値）は振り戻されず B のまま', () => {
+    const hotDryAgg = makeAgg({
+      monthlyT: [5, 8, 12, 18, 24, 30, 32, 30, 24, 18, 12, 8],
+      monthlyP: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], // 年 120mm（dry）
+    });
+    // annualMean ≈ 17.6, winterMin = 5, summerMax = 32 → C 候補（D 候補ではない）
+    const result = __internals.classifyCell(hotDryAgg, DEFAULT_CLIMATE_ZONE_STEP_PARAMS);
+    expect(result.code.startsWith('B')).toBe(true);
+  });
+
+  it('§4.1.7: しきい値を 0 に下げると、年平均 5°C の冷涼 B 候補は B のまま（しきい値以下に該当しない）', () => {
+    const coolAgg = makeAgg({
+      monthlyT: [-5, -3, 0, 5, 10, 15, 17, 15, 10, 5, 0, -3],
+      monthlyP: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], // 年 120mm（dry）
+    });
+    // annualMean ≈ 5.6, winterMin = -5, summerMax = 17 → D 候補
+    const result = __internals.classifyCell(coolAgg, {
+      ...DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
+      aridReclassToDMaxAnnualTempCelsius: 0,
+    });
+    // 5.6 > 0 のため振り戻されず B のまま
+    expect(result.code.startsWith('B')).toBe(true);
+  });
+
   it('aridHotColdCriterion を annual に切替えても 4 階調コードが返る', () => {
     const grid = mapGridCells(baseGrid(), (cell) =>
       Math.abs(cell.latitudeDeg) <= 40 && cell.longitudeDeg >= 0 && cell.longitudeDeg <= 30

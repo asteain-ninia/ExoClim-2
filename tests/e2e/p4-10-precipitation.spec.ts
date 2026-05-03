@@ -95,12 +95,15 @@ test.describe('P4-10: Step 6 降水', () => {
     expect(after).not.toBe(before);
   });
 
-  test('ITCZ 影響帯半幅を 0 にすると Canvas 描画が変わる（very_wet が消えて wet が減る）', async ({ page }) => {
+  test('ITCZ 影響帯半幅を最大に上げると Canvas 描画が変わる（very_wet が拡張される）', async ({ page }) => {
     await page.getByTestId('legend-precipitation').check();
     await page.waitForTimeout(400);
     const before = await canvasFingerprint(page);
-    await setRangeValue(page, 'slider-precipitation-itcz-half-width', '0');
-    await page.waitForTimeout(1100);
+    // P4-17 で polar gyre streamline + collision point が precipitation overlay の上に重なる
+    // ようになり、fingerprint(16px サンプリング) での 15 → 5（縮小方向）の差分が検出限界を
+    // 下回ったため、拡大方向（15 → 30）に変更して明確な差を出す（[開発ガイド.md §6.2.2 参照]）。
+    await setRangeValue(page, 'slider-precipitation-itcz-half-width', '30');
+    await page.waitForTimeout(1500);
     const after = await canvasFingerprint(page);
     expect(after).not.toBe(before);
   });

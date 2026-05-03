@@ -113,6 +113,23 @@ export interface ClimateZoneStepParams {
    *   'annual': 年平均気温 ≥ 18°C なら Hot、< 18°C なら Cold（代替基準）
    */
   readonly aridHotColdCriterion: 'monthly' | 'annual';
+  /**
+   * §4.1.7 蒸発散量による B → D 再調整を有効化するか（既定 true、Worldbuilder's Log #40）。
+   *
+   * 寒冷地では蒸発が遅いため低降水量でも乾燥（B）にならず D 気候として扱うべき、
+   * という Pasta の補正規則を近似する。動画 #40 の「降水量ポイント × 年平均気温」
+   * マトリクスは具体係数が示されていないため、本実装では年平均気温による単一しきい値の
+   * 簡略近似を採用する（[docs/spec/07_気候帯.md §7.5]）。
+   */
+  readonly aridReclassToDEnabled: boolean;
+  /**
+   * §4.1.7 B → D 再調整の年平均気温しきい値（°C、既定 7°C）。
+   *
+   * B 候補（年降水量 < arid threshold）かつ D 候補（winterMin < 0°C）が重なるセルで、
+   * 年平均気温 ≤ 本値なら B → D に振り戻す。それより暖かければ B のまま。
+   * 既定 7°C は地球の北米/ユーラシア大陸の Bsk/BWk と D 群の境界経験値。
+   */
+  readonly aridReclassToDMaxAnnualTempCelsius: number;
 }
 
 export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
@@ -124,6 +141,8 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
     very_wet: 240,
   },
   aridHotColdCriterion: 'monthly',
+  aridReclassToDEnabled: true,
+  aridReclassToDMaxAnnualTempCelsius: 7,
 };
 
 /** 月別気温・降水量の集約結果。 */
@@ -379,7 +398,14 @@ function classifyCell(
     code = classifyPolar(agg);
   } else {
     const aridThreshold = computeAridThresholdMm(agg);
-    if (agg.annualPrecipMm < aridThreshold) {
+    const isAridCandidate = agg.annualPrecipMm < aridThreshold;
+    // §4.1.7: 寒冷地での B → D 振り戻し（[docs/spec/07_気候帯.md §4.1.7 / §7.5]、Worldbuilder's Log #40）
+    // 「寒冷地では蒸発が遅いため低降水量でも乾燥にならず D 気候として残る」ルールの近似。
+    // B 候補かつ D 候補（winterMin < 0°C）かつ年平均気温 ≤ しきい値で B → D に振り戻す。
+    const isDCandidate = agg.winterMinCelsius < D_C_WINTER_BOUNDARY_CELSIUS;
+    const isCold =
+      params.aridReclassToDEnabled && agg.annualMeanCelsius <= params.aridReclassToDMaxAnnualTempCelsius;
+    if (isAridCandidate && !(isDCandidate && isCold)) {
       code = classifyArid(agg, aridThreshold, params.aridHotColdCriterion);
     } else if (agg.winterMinCelsius < D_C_WINTER_BOUNDARY_CELSIUS) {
       code = classifyContinental(agg);
