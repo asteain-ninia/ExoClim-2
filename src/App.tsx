@@ -41,7 +41,10 @@ export function App() {
     <div className="app">
       <header className="app__header">
         <h1>ExoClim</h1>
-        <p>Worldbuilding Pasta 準拠の惑星気候設計ツール — Step 1 ITCZ 表示中</p>
+        <p>
+          Worldbuilding Pasta 準拠の惑星気候設計ツール — 全 7 Step
+          (ITCZ → 風帯 → 海流 → 気流 → 気温 → 降水 → 気候帯) 連結済
+        </p>
       </header>
       <main className="app__main">
         <section className="map-section">
