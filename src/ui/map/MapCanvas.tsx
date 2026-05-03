@@ -861,13 +861,17 @@ function drawOverlayBitmap(
   ctx: CanvasRenderingContext2D,
   bitmap: HTMLCanvasElement,
   normPanPx: number,
+  smoothing = false,
 ): void {
   const previousSmoothing = ctx.imageSmoothingEnabled;
-  ctx.imageSmoothingEnabled = false;
+  const previousQuality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingEnabled = smoothing;
+  if (smoothing) ctx.imageSmoothingQuality = 'high';
   for (const drawOffset of [normPanPx, normPanPx - CANVAS_WIDTH_PX]) {
     ctx.drawImage(bitmap, drawOffset, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
   }
   ctx.imageSmoothingEnabled = previousSmoothing;
+  ctx.imageSmoothingQuality = previousQuality;
 }
 
 /**
@@ -1315,9 +1319,13 @@ function drawMap(
   if (legendVisibility.precipitationLabels && precipitationBitmap) {
     drawOverlayBitmap(ctx, precipitationBitmap, norm);
   }
-  // 気候帯 overlay（陸地のみ、Köppen 配色）— 最終出力なので半透明度高めで主役表示
+  // 気候帯 overlay（陸地のみ、Köppen 配色）— 最終出力なので半透明度高めで主役表示。
+  // [P4-61] 1° per-cell の「カックカク」感緩和のため bilinear smoothing を有効化。
+  // 純色境界が薄くブレンドされて 1260×630 上で滑らかに見える。代償として境界の
+  // intermediate ピクセルが Köppen 配色テーブルに無い色になるが、視覚的には自然
+  // （実 Earth Köppen マップの遷移帯と同じ印象）。
   if (legendVisibility.climateZones && climateZoneBitmap) {
-    drawOverlayBitmap(ctx, climateZoneBitmap, norm);
+    drawOverlayBitmap(ctx, climateZoneBitmap, norm, true);
   }
   // 沿岸湧昇マスク（陸海の上、海氷の下、シアン半透明）
   if (legendVisibility.coastalUpwelling && coastalUpwellingBitmap) {

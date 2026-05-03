@@ -547,12 +547,13 @@ function applyBsRingAroundBw(zoneCodes: (ClimateZoneCode | null)[][]): void {
     for (let j = 0; j < cols; j++) {
       const z = snapshot[i]![j];
       if (!z || !z.startsWith('BW')) continue;
-      for (const [di, dj] of [
+      const neighbors: ReadonlyArray<readonly [number, number]> = [
         [0, 1],
         [0, -1],
         [1, 0],
         [-1, 0],
-      ]) {
+      ];
+      for (const [di, dj] of neighbors) {
         const ni = i + di;
         if (ni < 0 || ni >= rows) continue;
         const nj = ((j + dj) % cols + cols) % cols;
