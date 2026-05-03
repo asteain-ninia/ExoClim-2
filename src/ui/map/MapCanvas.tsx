@@ -1208,6 +1208,43 @@ function drawCollisionPoints(
   }
 }
 
+/** マウスオーバー中のセル（[現状.md §6 U15]、P4-40）に黄色枠を描く。
+ *  hovered grid index (lat/lon) からセル境界の (lat ± resolution/2, lon ± resolution/2) を
+ *  計算し、3 オフセットで stroke。経度ラップ起因の長距離ジャンプは drawCurrentStreamlines と
+ *  同じく `dx > W/2` で skip。
+ */
+function drawHoveredCellHighlight(
+  ctx: CanvasRenderingContext2D,
+  hoveredCell: { latIndex: number; lonIndex: number },
+  grid: Grid,
+  normPanPx: number,
+): void {
+  const cell = grid.cells[hoveredCell.latIndex]?.[hoveredCell.lonIndex];
+  if (!cell) return;
+  const half = grid.resolutionDeg / 2;
+  const minLat = cell.latitudeDeg - half;
+  const maxLat = cell.latitudeDeg + half;
+  const minLon = cell.longitudeDeg - half;
+  const maxLon = cell.longitudeDeg + half;
+  ctx.strokeStyle = '#ffe060';
+  ctx.lineWidth = 2;
+  for (const drawOffset of [normPanPx - CANVAS_WIDTH_PX, normPanPx, normPanPx + CANVAS_WIDTH_PX]) {
+    const tl = projectRaw(maxLat, minLon, VIEWPORT, drawOffset);
+    const tr = projectRaw(maxLat, maxLon, VIEWPORT, drawOffset);
+    const br = projectRaw(minLat, maxLon, VIEWPORT, drawOffset);
+    const bl = projectRaw(minLat, minLon, VIEWPORT, drawOffset);
+    // 経度ラップで矩形が画面幅を超えるケースは描かない（座標 wrap 起因の歪み防止）
+    if (Math.abs(tr.x - tl.x) > CANVAS_WIDTH_PX / 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(tl.x, tl.y);
+    ctx.lineTo(tr.x, tr.y);
+    ctx.lineTo(br.x, br.y);
+    ctx.lineTo(bl.x, bl.y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
 /** ITCZ 中心線をストロークする。3 オフセットで循環描画し、隣接インスタンス間も連結する。 */
 function drawCenterLine(
   ctx: CanvasRenderingContext2D,
@@ -1248,6 +1285,7 @@ function drawMap(
   isotherms: ReadonlyArray<IsothermLine> | null,
   oceanStreamlines: ReadonlyArray<CurrentStreamline> | null,
   collisionPoints: ReadonlyArray<CollisionPoint> | null,
+  hoveredCell: { latIndex: number; lonIndex: number } | null,
   grid: Grid | null,
   legendVisibility: LegendVisibility,
 ): void {
@@ -1322,6 +1360,10 @@ function drawMap(
   if (legendVisibility.isotherms && isotherms && isotherms.length > 0) {
     drawIsotherms(ctx, isotherms, norm);
   }
+  // マウスオーバー中のセル黄枠（[現状.md §6 U15]、P4-40）— 全 overlay の上に描画
+  if (hoveredCell && grid) {
+    drawHoveredCellHighlight(ctx, hoveredCell, grid, norm);
+  }
 }
 
 /**
@@ -1344,6 +1386,7 @@ export function MapCanvas() {
   const currentSeason = useUIStore((s) => s.currentSeason);
   const legendVisibility = useUIStore((s) => s.legendVisibility);
   const setHoveredCell = useUIStore((s) => s.setHoveredCell);
+  const hoveredCell = useUIStore((s) => s.hoveredCell);
   const baseInfluenceHalfWidthDeg = useParamsStore(
     (s) => s.itczParams.baseInfluenceHalfWidthDeg,
   );
@@ -1616,6 +1659,7 @@ export function MapCanvas() {
       isothermsForSeason,
       oceanStreamlinesForSeason,
       collisionPointsForSeason,
+      hoveredCell,
       grid,
       legendVisibility,
     );
@@ -1638,6 +1682,7 @@ export function MapCanvas() {
     isothermsForSeason,
     oceanStreamlinesForSeason,
     collisionPointsForSeason,
+    hoveredCell,
     grid,
     legendVisibility,
   ]);
