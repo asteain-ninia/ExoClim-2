@@ -5,6 +5,7 @@
 //   待機時間を 1100ms に増やしている（[開発ガイド.md §6.2.1]）。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el, v) => {
@@ -60,6 +61,7 @@ test.describe('P4-10: Step 6 降水', () => {
     // Step 6 を pipeline 追加後、初回パイプライン完了を吸収するため 1100ms 待機
     // [開発ガイド.md §6.2.1] Step 増加時の経験的目安
     await page.waitForTimeout(1100);
+    await openAllCollapsibleSections(page);
   });
 
   test('Step 6 降水パネル（5 スライダー）が表示される', async ({ page }) => {

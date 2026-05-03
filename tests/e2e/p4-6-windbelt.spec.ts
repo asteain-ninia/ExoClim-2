@@ -2,6 +2,7 @@
 // 仕様: [docs/spec/02_風帯.md §4 / §5] / [要件定義書.md §2.2.2]。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el, v) => {
@@ -48,6 +49,7 @@ test.describe('P4-6: Step 2 風帯', () => {
     });
     // Step 5 を pipeline に追加して初期計算が長くなったため十分な待機を取る。
     await page.waitForTimeout(900);
+    await openAllCollapsibleSections(page);
   });
 
   test('Step 2 風帯パネル（3 スライダー）が表示される', async ({ page }) => {

@@ -2,6 +2,7 @@
 // 仕様: [要件定義書.md §2.3.6] UI 未露出のパラメータは存在しない要件の完了。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 /**
  * range input の値を React 互換に設定する。
@@ -53,6 +54,7 @@ test.describe('P4-5c: 残りパラメータ UI（AtmosphereOcean / TerrainSource
     });
     // Step 5 (P4-9) を pipeline に追加して初期計算が長くなったため十分な待機を取る。
     await page.waitForTimeout(900);
+    await openAllCollapsibleSections(page);
   });
 
   test('AtmosphereOceanParams 9 スライダーがすべて表示される', async ({ page }) => {

@@ -4,6 +4,7 @@
 //   反映、CellInspector がそれを購読して詳細表示する。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 test.describe('P4-12: セル情報パネル（マウスオーバー）', () => {
   test.beforeEach(async ({ page }) => {
@@ -27,6 +28,7 @@ test.describe('P4-12: セル情報パネル（マウスオーバー）', () => {
     // 全 7 Step を pipeline に含めた状態で初回計算が完了するまで待機
     // [開発ガイド.md §6.2.1]
     await page.waitForTimeout(1300);
+    await openAllCollapsibleSections(page);
   });
 
   test('セル情報パネルが表示され、初期状態は「マウスオーバーで表示」案内', async ({ page }) => {

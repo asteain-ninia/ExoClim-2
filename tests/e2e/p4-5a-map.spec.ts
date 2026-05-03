@@ -3,6 +3,7 @@
 // 規約: 起動・初期表示・操作（季節切替・凡例切替・ドラッグパン）・経度循環の動作確認。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 /** Canvas のピクセルデータ和（描画内容の指紋として使う）。 */
 async function canvasPixelChecksum(page: Page): Promise<number> {
@@ -42,6 +43,7 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
       },
       { timeout: 10_000 },
     );
+    await openAllCollapsibleSections(page);
   });
 
   test('Canvas が固定サイズ（1260x630）で表示される（[要件定義書.md §2.3.1]）', async ({ page }) => {

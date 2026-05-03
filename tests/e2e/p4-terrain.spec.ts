@@ -2,6 +2,7 @@
 // 仕様: [要件定義書.md §2.1.4] 地形マップ / [§4.2] TerrainSource → 実体地形の解決。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 /** 地形ビットマップから陸地相当のピクセル数を概算する。 */
 async function countLandLikePixels(page: Page): Promise<number> {
@@ -38,6 +39,7 @@ test.describe('P4-terrain: 地球プリセットで陸地が描画される', ()
     });
     // useMemo の terrain ビットマップ生成は同期的だが、初回 pipeline 実行の Promise 解決を待つため少し余裕
     await page.waitForTimeout(150);
+    await openAllCollapsibleSections(page);
   });
 
   test('Canvas に陸地相当のピクセルが多数描画される（>1000）', async ({ page }) => {

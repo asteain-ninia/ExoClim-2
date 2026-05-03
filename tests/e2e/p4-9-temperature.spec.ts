@@ -2,6 +2,7 @@
 // 仕様: [docs/spec/05_気温.md §4 / §5]。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el, v) => {
@@ -55,6 +56,7 @@ test.describe('P4-9: Step 5 気温', () => {
       { timeout: 15_000 },
     );
     await page.waitForTimeout(900);
+    await openAllCollapsibleSections(page);
   });
 
   test('Step 5 気温パネル（6 スライダー）が表示される', async ({ page }) => {

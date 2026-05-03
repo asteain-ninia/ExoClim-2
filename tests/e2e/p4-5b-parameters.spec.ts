@@ -2,6 +2,7 @@
 // 仕様: [要件定義書.md §2.3.6] パラメータ調整 UI / [§2.1.1] 主星と軌道 / [§2.1.2] 惑星本体。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 /**
  * range input の値を React 互換に設定する。
@@ -63,6 +64,7 @@ test.describe('P4-5b: パラメータ調整 UI（OrbitalParams + PlanetBodyParam
     );
     // Step 5 (P4-9) を pipeline に追加して初期計算が長くなったため十分な待機を取る。
     await page.waitForTimeout(900);
+    await openAllCollapsibleSections(page);
   });
 
   test('OrbitalParams 5 スライダーがすべて表示される', async ({ page }) => {

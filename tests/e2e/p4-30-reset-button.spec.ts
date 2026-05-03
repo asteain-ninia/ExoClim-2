@@ -2,6 +2,7 @@
 // 仕様: [現状.md §6 U13]、[src/ui/ResetButton.tsx]。
 
 import { expect, test, type Page } from '@playwright/test';
+import { openAllCollapsibleSections } from './helpers';
 
 async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el, v) => {
@@ -40,6 +41,7 @@ test.describe('P4-30: グローバル reset ボタン (U13)', () => {
       { timeout: 10_000 },
     );
     await page.waitForTimeout(900);
+    await openAllCollapsibleSections(page);
   });
 
   test('reset ボタンが header に表示され「↺ 全リセット」ラベル', async ({ page }) => {
