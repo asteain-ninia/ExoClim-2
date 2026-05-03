@@ -15,7 +15,7 @@ export function PrecipitationStepParamsSliders() {
       <legend>降水 調整（Step 6）</legend>
       <Slider
         id="precipitation-max-wet-extension"
-        label="暖流 wet 帯 最大延伸"
+        label="暖流海岸 湿潤帯 最大延伸"
         unit="km"
         min={0}
         max={5000}
@@ -23,11 +23,12 @@ export function PrecipitationStepParamsSliders() {
         precision={0}
         value={precipitationParams.maxWetExtensionKm}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.maxWetExtensionKm}
+        helpText="暖流が運ぶ湿気が大陸内陸まで届く最大距離（地球 ≈ 2,000 km）。西岸海洋性気候の幅を決める。"
         onChange={(v) => setPrecipitationParams({ maxWetExtensionKm: v })}
       />
       <Slider
         id="precipitation-rainshadow-relief"
-        label="rainshadow desert 起伏"
+        label="雨陰砂漠 起伏しきい値"
         unit="m"
         min={500}
         max={5000}
@@ -35,6 +36,7 @@ export function PrecipitationStepParamsSliders() {
         precision={0}
         value={precipitationParams.rainshadowDesertReliefMeters}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.rainshadowDesertReliefMeters}
+        helpText="風上斜面でこの起伏を超える山脈の風下に乾燥地帯を生成（既定 2,000 m）。低くすると砂漠が増える。"
         onChange={(v) => setPrecipitationParams({ rainshadowDesertReliefMeters: v })}
       />
       <Slider
@@ -47,11 +49,12 @@ export function PrecipitationStepParamsSliders() {
         precision={0}
         value={precipitationParams.highElevationDryThresholdMeters}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.highElevationDryThresholdMeters}
+        helpText="この標高を超えるセルは乾燥扱い（既定 4,000 m、チベット高原・アンデス内陸を想定）。"
         onChange={(v) => setPrecipitationParams({ highElevationDryThresholdMeters: v })}
       />
       <Slider
         id="precipitation-windward-min-relief"
-        label="風上 wet 化 最低起伏"
+        label="風上斜面 湿潤化 最低起伏"
         unit="m"
         min={300}
         max={3000}
@@ -59,6 +62,7 @@ export function PrecipitationStepParamsSliders() {
         precision={0}
         value={precipitationParams.windwardWetMinReliefMeters}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.windwardWetMinReliefMeters}
+        helpText="風上斜面でこの起伏を超えると地形性降水で湿潤化（既定 1,000 m）。"
         onChange={(v) => setPrecipitationParams({ windwardWetMinReliefMeters: v })}
       />
       <Slider
@@ -71,6 +75,7 @@ export function PrecipitationStepParamsSliders() {
         precision={0}
         value={precipitationParams.itczInfluenceHalfWidthDeg}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.itczInfluenceHalfWidthDeg}
+        helpText="降水評価における ITCZ 中心線±この度の帯を強雨域とする。表示用とは独立に設定可能（Step 6 専用）。"
         onChange={(v) => setPrecipitationParams({ itczInfluenceHalfWidthDeg: v })}
       />
     </fieldset>

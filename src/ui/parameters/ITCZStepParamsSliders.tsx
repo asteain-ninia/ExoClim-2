@@ -26,6 +26,7 @@ export function ITCZStepParamsSliders() {
         precision={1}
         value={itczParams.baseInfluenceHalfWidthDeg}
         defaultValue={DEFAULT_ITCZ_STEP_PARAMS.baseInfluenceHalfWidthDeg}
+        helpText="ITCZ 中心線の南北 ±この度の帯を「ITCZ 影響圏」として表示・降水評価に使う（地球 = 約 ±15°）。"
         onChange={(v) => setITCZParams({ baseInfluenceHalfWidthDeg: v })}
       />
       <Slider
@@ -50,6 +51,7 @@ export function ITCZStepParamsSliders() {
         precision={1}
         value={itczParams.monsoonPullStrengthDeg}
         defaultValue={DEFAULT_ITCZ_STEP_PARAMS.monsoonPullStrengthDeg}
+        helpText="夏半球の大陸上で ITCZ が極側に追加で引き寄せられる量（地球のインドモンスーン効果に対応）。0 で線型移動。"
         onChange={(v) => setITCZParams({ monsoonPullStrengthDeg: v })}
       />
       <Slider

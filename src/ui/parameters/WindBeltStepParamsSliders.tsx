@@ -15,7 +15,7 @@ export function WindBeltStepParamsSliders() {
       <legend>風帯 調整（Step 2）</legend>
       <Slider
         id="wind-subtropical-shift"
-        label="亜熱帯高気圧 季節移動"
+        label="亜熱帯高気圧帯 季節移動量"
         unit="°"
         min={0}
         max={15}
@@ -23,11 +23,12 @@ export function WindBeltStepParamsSliders() {
         precision={1}
         value={windBeltParams.subtropicalHighSeasonalShiftDeg}
         defaultValue={DEFAULT_WIND_BELT_STEP_PARAMS.subtropicalHighSeasonalShiftDeg}
+        helpText="亜熱帯高気圧帯（緯度 30° 付近）が夏冬で南北に移動する量。地中海性気候の生成に影響。"
         onChange={(v) => setWindBeltParams({ subtropicalHighSeasonalShiftDeg: v })}
       />
       <Slider
         id="wind-continental-anomaly"
-        label="大陸気圧 anomaly 強度"
+        label="大陸性 気圧偏差 強度"
         unit="hPa"
         min={0}
         max={15}
@@ -35,11 +36,12 @@ export function WindBeltStepParamsSliders() {
         precision={1}
         value={windBeltParams.continentalPressureAnomalyHpa}
         defaultValue={DEFAULT_WIND_BELT_STEP_PARAMS.continentalPressureAnomalyHpa}
+        helpText="大陸内陸の夏低圧/冬高圧の振幅（hPa）。モンスーン強度に直結。"
         onChange={(v) => setWindBeltParams({ continentalPressureAnomalyHpa: v })}
       />
       <Slider
         id="wind-mean-speed"
-        label="卓越風 代表速さ"
+        label="卓越風 平均風速"
         unit="m/s"
         min={0}
         max={20}
@@ -47,6 +49,7 @@ export function WindBeltStepParamsSliders() {
         precision={1}
         value={windBeltParams.meanWindSpeedMps}
         defaultValue={DEFAULT_WIND_BELT_STEP_PARAMS.meanWindSpeedMps}
+        helpText="貿易風・偏西風の代表速度（地球 ≈ 7 m/s）。海岸湿潤帯の延伸距離（fetch）に影響。"
         onChange={(v) => setWindBeltParams({ meanWindSpeedMps: v })}
       />
     </fieldset>
