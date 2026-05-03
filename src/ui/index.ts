@@ -16,6 +16,7 @@ export {
 } from './OnboardingModal';
 export { ResetButton } from './ResetButton';
 export { SettingsIoButtons } from './SettingsIoButtons';
+export { ThemeToggle } from './ThemeToggle';
 export { Toast } from './Toast';
 
 export {

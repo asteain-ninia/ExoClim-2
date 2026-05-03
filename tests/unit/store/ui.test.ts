@@ -98,4 +98,21 @@ describe('store/ui: UI 状態 store', () => {
       expect(store.getState().advancedMode).toBe(false);
     });
   });
+
+  describe('setTheme ([P4-45])', () => {
+    it('初期値は dark', () => {
+      expect(store.getState().theme).toBe('dark');
+    });
+    it('light / dark を切替えできる', () => {
+      store.getState().setTheme('light');
+      expect(store.getState().theme).toBe('light');
+      store.getState().setTheme('dark');
+      expect(store.getState().theme).toBe('dark');
+    });
+    it('reset で dark に戻る', () => {
+      store.getState().setTheme('light');
+      store.getState().reset();
+      expect(store.getState().theme).toBe('dark');
+    });
+  });
 });

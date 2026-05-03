@@ -1,5 +1,51 @@
 /* ExoClim グローバルスタイル（最小限）。 */
 
+/*
+ * テーマ変数 ([現状.md §6 U9]、P4-45)
+ *
+ * 既定はダークテーマ（:root）。`<html data-theme="light">` を指定すると
+ * ライトテーマ用の上書きが適用される。`<ThemeToggle>` がトグルする。
+ * MapCanvas の Canvas 描画色（地形シェード・気候帯 overlay 等）はテーマ
+ * 変数の影響を受けない（ピクセルレンダリング層は別系統）。
+ */
+:root {
+  --bg-app: #0a1722;
+  --bg-panel: #14202c;
+  --bg-control: #1a2c3d;
+  --bg-control-hover: #2a4055;
+  --text-primary: #d8e6f4;
+  --text-secondary: #aac8e0;
+  --text-tertiary: #8aa0b8;
+  --text-muted: #6f8aa0;
+  --border: #2a4055;
+  --border-strong: #4a6075;
+  --accent: #6090c0;
+  --accent-gold: #ffd060;
+  --accent-gold-text: #ffe090;
+  --danger-bg: #5a3030;
+  --danger-border: #c08080;
+  --danger-text: #ffd0d0;
+}
+
+[data-theme="light"] {
+  --bg-app: #f0f4f8;
+  --bg-panel: #ffffff;
+  --bg-control: #e6ecf2;
+  --bg-control-hover: #d4dde6;
+  --text-primary: #1a2c3d;
+  --text-secondary: #2a4055;
+  --text-tertiary: #4a6075;
+  --text-muted: #6a7a8a;
+  --border: #c8d4e0;
+  --border-strong: #a8b8c8;
+  --accent: #2d4f6a;
+  --accent-gold: #c89020;
+  --accent-gold-text: #80580a;
+  --danger-bg: #ffd8d8;
+  --danger-border: #c08080;
+  --danger-text: #6a2020;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -17,9 +63,10 @@ body {
 }
 
 body {
-  background: #0a1722;
-  color: #d8e6f4;
+  background: var(--bg-app);
+  color: var(--text-primary);
   min-height: 100vh;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .app {
@@ -36,7 +83,7 @@ body {
 
 .app__header p {
   margin: 0 0 16px;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   font-size: 0.9rem;
 }
 
@@ -55,9 +102,9 @@ body {
 .app__reset-btn {
   flex: 0 0 auto;
   padding: 8px 14px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #4a6075;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -66,7 +113,7 @@ body {
 }
 
 .app__reset-btn:hover {
-  background: #2a4055;
+  background: var(--border);
 }
 
 .app__reset-btn--confirming {
@@ -89,9 +136,9 @@ body {
 .app__advanced-toggle {
   flex: 0 0 auto;
   padding: 8px 14px;
-  background: #1a2c3d;
+  background: var(--bg-control);
   color: #a8b8c8;
-  border: 1px solid #4a6075;
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -100,13 +147,13 @@ body {
 }
 
 .app__advanced-toggle:hover {
-  background: #2a4055;
+  background: var(--border);
 }
 
 .app__advanced-toggle--on {
   background: #2d3f5a;
-  border-color: #ffd060;
-  color: #ffe090;
+  border-color: var(--accent-gold);
+  color: var(--accent-gold-text);
 }
 
 .app__advanced-toggle--on:hover {
@@ -116,9 +163,9 @@ body {
 .app__help-btn {
   flex: 0 0 auto;
   padding: 8px 14px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #4a6075;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -127,8 +174,26 @@ body {
 }
 
 .app__help-btn:hover {
-  background: #2a4055;
-  border-color: #6090c0;
+  background: var(--border);
+  border-color: var(--accent);
+}
+
+.app__theme-btn {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.app__theme-btn:hover {
+  background: var(--border);
+  border-color: var(--accent);
 }
 
 /* === Onboarding modal ([現状.md §6 U14]、P4-44) === */
@@ -149,9 +214,9 @@ body {
   width: min(100%, 540px);
   max-height: 86vh;
   overflow-y: auto;
-  background: #14202c;
-  color: #d8e6f4;
-  border: 1px solid #4a6075;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 28px 28px 20px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
@@ -172,14 +237,14 @@ body {
 }
 
 .onboarding-modal__close:hover {
-  background: #2a4055;
+  background: var(--border);
   color: #ffffff;
 }
 
 .onboarding-modal__title {
   margin: 0 0 12px;
   font-size: 1.25rem;
-  color: #ffe090;
+  color: var(--accent-gold-text);
 }
 
 .onboarding-modal__body {
@@ -201,7 +266,7 @@ body {
 }
 
 .onboarding-modal__body code {
-  background: #1a2c3d;
+  background: var(--bg-control);
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 0.85em;
@@ -225,11 +290,11 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2a4055;
+  background: var(--border);
 }
 
 .onboarding-modal__dot--active {
-  background: #ffd060;
+  background: var(--accent-gold);
 }
 
 .onboarding-modal__actions {
@@ -240,16 +305,16 @@ body {
 
 .onboarding-modal__btn {
   padding: 8px 14px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #4a6075;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .onboarding-modal__btn:hover {
-  background: #2a4055;
+  background: var(--border);
 }
 
 .onboarding-modal__btn--ghost {
@@ -259,7 +324,7 @@ body {
 
 .onboarding-modal__btn--primary {
   background: #2d4f6a;
-  border-color: #6090c0;
+  border-color: var(--accent);
   color: #ffffff;
 }
 
@@ -270,9 +335,9 @@ body {
 .app__export-btn {
   flex: 0 0 auto;
   padding: 8px 14px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #4a6075;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -281,8 +346,8 @@ body {
 }
 
 .app__export-btn:hover {
-  background: #2a4055;
-  border-color: #6090c0;
+  background: var(--border);
+  border-color: var(--accent);
 }
 
 /* === Loading indicator ([現状.md §6 U12]) === */
@@ -292,18 +357,18 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: #aac8e0;
+  color: var(--text-secondary);
   padding: 4px 8px;
-  background: #14202c;
-  border: 1px solid #2a4055;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 4px;
 }
 
 .loading-indicator__spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid #2a4055;
-  border-top-color: #aac8e0;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-secondary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -316,8 +381,8 @@ body {
 .app__footer {
   margin-top: 24px;
   padding: 12px 16px;
-  border-top: 1px solid #2a4055;
-  color: #6f8aa0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
   font-size: 0.78rem;
   display: flex;
   flex-wrap: wrap;
@@ -326,26 +391,26 @@ body {
 }
 
 .app__footer code {
-  background: #1a2c3d;
+  background: var(--bg-control);
   padding: 1px 5px;
   border-radius: 3px;
   font-family: 'Consolas', 'Monaco', monospace;
-  color: #aac8e0;
+  color: var(--text-secondary);
   font-size: 0.85em;
 }
 
 .app__footer-sep {
-  color: #4a6075;
+  color: var(--border-strong);
 }
 
 .app__footer-link {
-  color: #aac8e0;
+  color: var(--text-secondary);
   text-decoration: none;
-  border-bottom: 1px dotted #4a6075;
+  border-bottom: 1px dotted var(--border-strong);
 }
 
 .app__footer-link:hover {
-  color: #d8e6f4;
+  color: var(--text-primary);
   border-bottom-style: solid;
 }
 
@@ -371,8 +436,8 @@ body {
   border-radius: 4px;
   border: 1px solid;
   font-size: 0.85rem;
-  background: #14202c;
-  color: #d8e6f4;
+  background: var(--bg-panel);
+  color: var(--text-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   pointer-events: auto;
   animation: toast-in 0.18s ease-out;
@@ -397,7 +462,7 @@ body {
 
 .toast--info {
   background: #1a242c;
-  border-color: #6090c0;
+  border-color: var(--accent);
   color: #c0d8e8;
 }
 
@@ -469,9 +534,9 @@ body {
 .season-selector__btn {
   padding: 6px 14px;
   font-size: 0.9rem;
-  background: #14202c;
-  color: #d8e6f4;
-  border: 1px solid #2a4055;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -481,8 +546,8 @@ body {
 }
 
 .season-selector__btn--active {
-  background: #2a4055;
-  border-color: #4a6075;
+  background: var(--border);
+  border-color: var(--border-strong);
 }
 
 /* 凡例パネル（.param-group を継承し、リスト構造のみ追加） */
@@ -491,10 +556,10 @@ body {
   margin: 12px 0 4px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   letter-spacing: 0.04em;
   text-transform: none;
-  border-bottom: 1px dashed #2a4055;
+  border-bottom: 1px dashed var(--border);
   padding-bottom: 2px;
 }
 
@@ -522,7 +587,7 @@ body {
 
 .legend-panel__note {
   margin: 10px 0 0;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -547,7 +612,7 @@ body {
 
 .legend-swatch--wind {
   background: transparent;
-  border-color: #aac8e0;
+  border-color: var(--text-secondary);
   position: relative;
 }
 
@@ -565,7 +630,7 @@ body {
 
 .legend-swatch--sea-ice {
   background: rgba(230, 240, 250, 0.85);
-  border-color: #d8e6f4;
+  border-color: var(--text-primary);
 }
 
 .legend-swatch--upwelling {
@@ -729,7 +794,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #aac8e0;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   line-height: 1;
 }
@@ -737,8 +802,8 @@ body {
 /* === Collapsible Section ([現状.md §6 U2]) === */
 
 .collapsible-section {
-  background: #14202c;
-  border: 1px solid #2a4055;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 4px;
   margin: 0;
   min-width: 0;
@@ -749,7 +814,7 @@ body {
   padding: 10px 14px;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #d8e6f4;
+  color: var(--text-primary);
   list-style: none; /* 既定の三角を消す */
   user-select: none;
   position: relative;
@@ -768,7 +833,7 @@ body {
   top: 50%;
   transform: translateY(-50%);
   font-size: 0.7rem;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   transition: transform 0.15s ease;
 }
 
@@ -777,7 +842,7 @@ body {
 }
 
 .collapsible-section__summary:hover {
-  background: #1a2c3d;
+  background: var(--bg-control);
 }
 
 .collapsible-section__body {
@@ -809,8 +874,8 @@ body {
 .param-group {
   /* fieldset は子要素の min-content で width が膨らむデフォルト挙動があるため明示的に 0 へ */
   min-width: 0;
-  background: #14202c;
-  border: 1px solid #2a4055;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 10px 14px 12px;
   margin: 0;
@@ -820,7 +885,7 @@ body {
   padding: 0 6px;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #d8e6f4;
+  color: var(--text-primary);
 }
 
 .slider {
@@ -837,7 +902,7 @@ body {
   align-items: baseline;
   gap: 8px;
   font-size: 0.85rem;
-  color: #d8e6f4;
+  color: var(--text-primary);
   margin-bottom: 2px;
   cursor: default;
 }
@@ -861,8 +926,8 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #2a4055;
-  color: #aac8e0;
+  background: var(--border);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
   cursor: help;
@@ -872,21 +937,21 @@ body {
 
 .slider__help:hover,
 .slider__help:focus-visible {
-  background: #4a6075;
-  color: #d8e6f4;
+  background: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .slider__value {
   flex: 0 0 auto;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: #aac8e0;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
 .slider__unit {
   margin-left: 2px;
-  color: #6f8aa0;
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -908,9 +973,9 @@ body {
   width: 24px;
   height: 24px;
   padding: 0;
-  background: #1a2c3d;
-  color: #aac8e0;
-  border: 1px solid #2a4055;
+  background: var(--bg-control);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.95rem;
@@ -918,8 +983,8 @@ body {
 }
 
 .slider__reset:hover {
-  background: #2a4055;
-  color: #d8e6f4;
+  background: var(--border);
+  color: var(--text-primary);
 }
 
 .param-toggle {
@@ -931,7 +996,7 @@ body {
 
 .param-toggle__label {
   font-size: 0.85rem;
-  color: #d8e6f4;
+  color: var(--text-primary);
 }
 
 .param-toggle__buttons {
@@ -942,9 +1007,9 @@ body {
 .param-toggle__btn {
   flex: 1;
   padding: 5px 10px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #2a4055;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.85rem;
@@ -955,8 +1020,8 @@ body {
 }
 
 .param-toggle__btn--active {
-  background: #2a4055;
-  border-color: #4a6075;
+  background: var(--border);
+  border-color: var(--border-strong);
 }
 
 .terrain-preset-row {
@@ -968,15 +1033,15 @@ body {
 
 .terrain-preset-row__label {
   font-size: 0.85rem;
-  color: #d8e6f4;
+  color: var(--text-primary);
 }
 
 .terrain-preset-row__select {
   width: 100%;
   padding: 5px 8px;
-  background: #1a2c3d;
-  color: #d8e6f4;
-  border: 1px solid #2a4055;
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -984,7 +1049,7 @@ body {
 
 .param-note {
   margin: 10px 0 0;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -1002,19 +1067,19 @@ body {
 }
 
 .cell-inspector__list dt {
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .cell-inspector__list dd {
   margin: 0;
-  color: #d8e6f4;
+  color: var(--text-primary);
   word-break: break-word;
 }
 
 .cell-inspector__empty {
   margin: 4px 0 0;
-  color: #8aa0b8;
+  color: var(--text-tertiary);
   font-size: 0.85rem;
 }

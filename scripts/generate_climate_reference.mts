@@ -77,7 +77,6 @@ console.log(`Grid: ${rows} × ${cols}`);
 const isLand = (r: number, c: number): boolean => grid.cells[r]![c]!.isLand;
 const elev = (r: number, c: number): number => grid.cells[r]![c]!.elevationMeters;
 const lat = (r: number): number => grid.cells[r]![0]!.latitudeDeg;
-const lon = (c: number): number => grid.cells[0]![c]!.longitudeDeg;
 
 // ----- 海岸距離マップ（経度方向に W/E/任意） ---------------------------
 
@@ -216,7 +215,6 @@ const coastInfo = computeCoastInfo();
 function assignKoppen(r: number, c: number): string | null {
   if (!isLand(r, c)) return null;
   const latDeg = lat(r);
-  const lonDeg = lon(c);
   const absLat = Math.abs(latDeg);
   const elevM = elev(r, c);
   const ci = coastInfo[r]![c]!;

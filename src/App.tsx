@@ -2,7 +2,7 @@
 // 仕様: [要件定義書.md §1.2] 三層構成（入力・シミュレーション・表示）の表示層エントリ。
 // 規約: 状態層 store と Worker bridge を接続し、UI 層コンポーネントを配置する。
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   connectStoresToBridge,
   useNotificationsStore,
@@ -35,12 +35,47 @@ import {
   SettingsIoButtons,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,
+  ThemeToggle,
   Toast,
   WindBeltStepParamsSliders,
 } from '@/ui';
 import { createWorkerPipelineBridge } from '@/worker';
 
+const THEME_KEY = 'exoclim-theme';
+
 export function App() {
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+  const hasRestored = useRef(false);
+
+  // 起動時に localStorage から復元 → 以降の theme 変更で <html data-theme> + LS 同期。
+  // 復元前に LS を書き込むと初期値（dark）で上書きされてしまうので、
+  // hasRestored フラグで「復元 effect が完了してから」のみ書き込む。
+  useEffect(() => {
+    if (!hasRestored.current) {
+      try {
+        const saved = window.localStorage.getItem(THEME_KEY);
+        if (saved === 'light' || saved === 'dark') setTheme(saved);
+      } catch {
+        // localStorage 不可
+      }
+      hasRestored.current = true;
+      return; // この pass では DOM 反映だけスキップ（次の theme 更新で適用）
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // ignore
+    }
+  }, [theme, setTheme]);
+
+  // 初回マウント時に DOM だけは同期（restore 完了前なので LS 書き込みは行わない）
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const bridge = createWorkerPipelineBridge();
     const { dispose } = connectStoresToBridge(useParamsStore, useResultsStore, bridge, {
@@ -66,6 +101,7 @@ export function App() {
           </div>
           <div className="app__header-actions">
             <LoadingIndicator />
+            <ThemeToggle />
             <AdvancedModeToggle />
             <HelpButton />
             <ExportPngButton />

@@ -87,6 +87,13 @@ export interface UIState {
    * 既定 `false`（初心者向けに UI を簡潔に保つ）。
    */
   readonly advancedMode: boolean;
+  /**
+   * テーマ（[現状.md §6 U9]、P4-45 追加）。
+   * 'dark' は既定の濃紺ベース、'light' は明色ベース。
+   * `<ThemeToggle>` がトグルし、`<App>` の useEffect が `<html data-theme>` に
+   * 反映する。localStorage に永続化される（key: 'exoclim-theme'）。
+   */
+  readonly theme: 'dark' | 'light';
 }
 
 export interface UIActions {
@@ -100,6 +107,8 @@ export interface UIActions {
   readonly setIsComputing: (computing: boolean) => void;
   /** 上級モードを切替える（[P4-43]）。 */
   readonly setAdvancedMode: (enabled: boolean) => void;
+  /** テーマを切替える（[P4-45]）。 */
+  readonly setTheme: (theme: 'dark' | 'light') => void;
   readonly reset: () => void;
 }
 
@@ -129,6 +138,7 @@ const INITIAL_UI_STATE: UIState = {
   hoveredCell: null,
   isComputing: false,
   advancedMode: false,
+  theme: 'dark',
 };
 
 export const createUIStore = () =>
@@ -143,6 +153,7 @@ export const createUIStore = () =>
     setHoveredCell: (cell) => set({ hoveredCell: cell }),
     setIsComputing: (isComputing) => set({ isComputing }),
     setAdvancedMode: (advancedMode) => set({ advancedMode }),
+    setTheme: (theme) => set({ theme }),
     reset: () => set(INITIAL_UI_STATE),
   }));
 
