@@ -40,6 +40,45 @@ body {
   font-size: 0.9rem;
 }
 
+.app__header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.app__header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.app__reset-btn {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: #1a2c3d;
+  color: #d8e6f4;
+  border: 1px solid #4a6075;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.app__reset-btn:hover {
+  background: #2a4055;
+}
+
+.app__reset-btn--confirming {
+  background: #5a3030;
+  border-color: #c08080;
+  color: #ffd0d0;
+}
+
+.app__reset-btn--confirming:hover {
+  background: #6a3838;
+}
+
 .app__main {
   display: flex;
   flex-direction: column;

@@ -21,6 +21,7 @@ import {
   OrbitalSliders,
   PlanetBodySliders,
   PrecipitationStepParamsSliders,
+  ResetButton,
   SeasonSelector,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,
@@ -41,11 +42,16 @@ export function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <h1>ExoClim</h1>
-        <p>
-          Worldbuilding Pasta 準拠の惑星気候設計ツール — 全 7 Step
-          (ITCZ → 風帯 → 海流 → 気流 → 気温 → 降水 → 気候帯) 連結済
-        </p>
+        <div className="app__header-row">
+          <div className="app__header-text">
+            <h1>ExoClim</h1>
+            <p>
+              Worldbuilding Pasta 準拠の惑星気候設計ツール — 全 7 Step
+              (ITCZ → 風帯 → 海流 → 気流 → 気温 → 降水 → 気候帯) 連結済
+            </p>
+          </div>
+          <ResetButton />
+        </div>
       </header>
       <main className="app__main">
         <section className="map-section">
