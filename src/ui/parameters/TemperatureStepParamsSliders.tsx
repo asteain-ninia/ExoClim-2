@@ -93,6 +93,19 @@ export function TemperatureStepParamsSliders() {
         helpText="等温線描画の刻み幅（既定 10°C）。0 で等温線非表示。小さいと線が密、大きいと粗くなる。"
         onChange={(v) => setTemperatureParams({ isothermIntervalCelsius: v })}
       />
+      <Slider
+        id="temperature-coastal-inland-reach"
+        label="海流補正の内陸到達距離"
+        unit="セル"
+        min={0}
+        max={15}
+        step={1}
+        precision={0}
+        value={temperatureParams.coastalCorrectionInlandReachCells}
+        defaultValue={DEFAULT_TEMPERATURE_STEP_PARAMS.coastalCorrectionInlandReachCells}
+        helpText="暖流/寒流の温度補正が陸内何セルまで届くか（既定 5）。0 で旧挙動（陸セル補正 0）。Pasta WL#28 由来、東岸湿潤亜熱帯/西岸乾燥の主因。"
+        onChange={(v) => setTemperatureParams({ coastalCorrectionInlandReachCells: v })}
+      />
     </fieldset>
   );
 }

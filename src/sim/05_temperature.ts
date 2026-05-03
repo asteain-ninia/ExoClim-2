@@ -139,6 +139,16 @@ export interface TemperatureStepParams {
    * （[docs/spec/05_気温.md §4.12]）。10°C 既定。
    */
   readonly isothermIntervalCelsius: number;
+  /**
+   * 海岸補正の内陸到達距離（セル単位、[現状.md ユーザ指摘 2026-05-03、P4-50]）。
+   *
+   * 旧来は陸セルの coastal correction が常に 0 となり、同緯度東西で気温が
+   * 一致する症状（→ Step 7 で同色気候帯）が発生していた。本値を増やすと
+   * 隣接海セルの correction が線形減衰で陸地内まで伝播する（reach=0 で旧挙動）。
+   *
+   * 既定 5 セル（解像度 1° で約 5°/550km、Pasta WL#28 の「数百 km 内陸まで」記述に整合）。
+   */
+  readonly coastalCorrectionInlandReachCells: number;
 }
 
 export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
@@ -148,6 +158,7 @@ export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   snowIceFeedbackIterations: 2,
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
+  coastalCorrectionInlandReachCells: 5,
 };
 
 /**
@@ -361,6 +372,71 @@ function computeDistanceToOcean(grid: Grid): number[][] {
 }
 
 /**
+ * 海セルの coastal correction を陸セルへ伝播させる（[現状.md ユーザ指摘 2026-05-03、P4-50]）。
+ *
+ * 旧来は陸セルの correction = 0 → 同緯度の land 温度が一致 → 気候帯が東西対称になる
+ * 症状の主因の 1 つ。Pasta `Worldbuilder's Log #28` で「暖流/寒流は数百 km 内陸の
+ * 気温に効く」と説明される現象を、最寄り海セルからの線形減衰で近似する。
+ *
+ * アルゴリズム: 各陸セルから (2*reach+1)^2 の窓を Chebyshev 距離で走査し、
+ * 窓内の海セルの correction × decay の中で **絶対値最大** の符号付き値を採用する。
+ * 経度はラップ、緯度はクランプ。
+ *
+ * 海セルは元の correction を保持。reach=0 なら何もしない。
+ */
+function propagateCoastalCorrectionInland(
+  grid: Grid,
+  oceanCorrection: ReadonlyArray<ReadonlyArray<number>>,
+  reachCells: number,
+): number[][] {
+  const rows = grid.latitudeCount;
+  const cols = grid.longitudeCount;
+  const out: number[][] = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    const sourceRow = oceanCorrection[i];
+    out[i] = sourceRow ? Array.from(sourceRow) : new Array<number>(cols).fill(0);
+  }
+  if (reachCells <= 0) return out;
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue; // 海はそのまま
+      // (2*reach+1)^2 窓走査
+      let bestAbs = 0;
+      let bestSigned = 0;
+      for (let di = -reachCells; di <= reachCells; di++) {
+        const ni = i + di;
+        if (ni < 0 || ni >= rows) continue;
+        const nRow = grid.cells[ni];
+        if (!nRow) continue;
+        const corrRow = oceanCorrection[ni];
+        if (!corrRow) continue;
+        for (let dj = -reachCells; dj <= reachCells; dj++) {
+          const nj = ((j + dj) % cols + cols) % cols;
+          const nCell = nRow[nj];
+          if (!nCell || nCell.isLand) continue; // 陸は source 不可
+          const sourceCorr = corrRow[nj] ?? 0;
+          if (sourceCorr === 0) continue;
+          const cheb = Math.max(Math.abs(di), Math.abs(dj));
+          if (cheb > reachCells) continue;
+          const decay = Math.max(0, 1 - cheb / (reachCells + 1));
+          const weighted = sourceCorr * decay;
+          const absVal = Math.abs(weighted);
+          if (absVal > bestAbs) {
+            bestAbs = absVal;
+            bestSigned = weighted;
+          }
+        }
+      }
+      out[i]![j] = bestSigned;
+    }
+  }
+  return out;
+}
+
+/**
  * 全セル × 全月の温度を「lapse rate + plateau cap + 海岸補正 + continentality」で初期化する。
  *
  * - 標高補正（[§4.3]）: 陸地で `lapseRate × elevationKm` を引く。海洋は基準面なので無補正。
@@ -377,6 +453,7 @@ function buildInitialMonthlyTemperatureCelsius(
   oceanCurrent: OceanCurrentResult,
   distToOcean: number[][],
   continentalityStrength: number,
+  coastalCorrectionInlandReachCells: number,
 ): number[][][] {
   const rows = grid.latitudeCount;
   const cols = grid.longitudeCount;
@@ -385,10 +462,21 @@ function buildInitialMonthlyTemperatureCelsius(
   for (let m = 0; m < MONTHS_PER_YEAR; m++) {
     const monthMap: number[][] = new Array(rows);
     const coastalCorrection = oceanCurrent.monthlyCoastalTemperatureCorrectionCelsius[m];
+    // 月別: ocean cell の coastal correction を陸セルへ「最寄り海セルから線形減衰」で
+    // 伝播させた拡張マップ（[現状.md ユーザ指摘 2026-05-03、P4-50]）。
+    // 旧来は陸セルの correction が常に 0 → 同緯度で東西温度差が無く、Step 7 で
+    // 同色の気候帯ラベルになる症状の主因の 1 つだった。
+    const extendedCorrection = coastalCorrection
+      ? propagateCoastalCorrectionInland(
+          grid,
+          coastalCorrection,
+          coastalCorrectionInlandReachCells,
+        )
+      : null;
     for (let i = 0; i < rows; i++) {
       const cellRow = grid.cells[i];
       const base = latByMonthBase[i]?.[m] ?? 0;
-      const correctionRow = coastalCorrection?.[i];
+      const correctionRow = extendedCorrection?.[i] ?? coastalCorrection?.[i];
       const row: number[] = new Array(cols);
       for (let j = 0; j < cols; j++) {
         const cell = cellRow?.[j];
@@ -400,12 +488,15 @@ function buildInitialMonthlyTemperatureCelsius(
         if (cell.isLand) {
           const elevKm = cell.elevationMeters / 1000;
           t -= lapseRateCelsiusPerKm * elevKm;
-          if (cell.elevationMeters > PLATEAU_ELEVATION_THRESHOLD_METERS) {
-            t = Math.min(t, PLATEAU_TEMPERATURE_CAP_CELSIUS);
-          }
         }
         const correction = correctionRow?.[j] ?? 0;
         t += correction;
+        // 高地高原キャップ ([§4.4]) は coastal correction 適用後にも残るよう
+        // ここで再適用する（propagation で陸内陸の高地に warm correction が乗り、
+        // キャップを超える事例があるため [P4-50]）。
+        if (cell?.isLand && cell.elevationMeters > PLATEAU_ELEVATION_THRESHOLD_METERS) {
+          t = Math.min(t, PLATEAU_TEMPERATURE_CAP_CELSIUS);
+        }
         row[j] = t;
       }
       monthMap[i] = row;
@@ -786,6 +877,7 @@ export function computeTemperature(
     oceanCurrentResult,
     distToOcean,
     params.continentalityStrength,
+    params.coastalCorrectionInlandReachCells,
   );
 
   // 6. 風移流補正（月別）
@@ -795,6 +887,28 @@ export function computeTemperature(
       const tm = monthlyTemp[m];
       if (!wm || !tm) continue;
       monthlyTemp[m] = applyWindAdvection(tm, wm, params.windAdvectionStrength);
+    }
+    // 風移流後に高地高原キャップを再適用（[§4.4]）。
+    // advection が暖い隣接セルから熱を運び込むと plateau cap を超えるため
+    // ([P4-50] で coastal correction inland propagation 強化により顕在化)。
+    for (let m = 0; m < MONTHS_PER_YEAR; m++) {
+      const tm = monthlyTemp[m];
+      if (!tm) continue;
+      for (let i = 0; i < rows; i++) {
+        const cellRow = grid.cells[i];
+        const tRow = tm[i];
+        if (!cellRow || !tRow) continue;
+        for (let j = 0; j < cols; j++) {
+          const cell = cellRow[j];
+          if (
+            cell?.isLand &&
+            cell.elevationMeters > PLATEAU_ELEVATION_THRESHOLD_METERS &&
+            tRow[j]! > PLATEAU_TEMPERATURE_CAP_CELSIUS
+          ) {
+            tRow[j] = PLATEAU_TEMPERATURE_CAP_CELSIUS;
+          }
+        }
+      }
     }
   }
 
@@ -950,4 +1064,5 @@ export const __internals = {
   computeDistanceToOcean,
   extractIsotherms,
   extractIsothermSegmentsAtLevel,
+  propagateCoastalCorrectionInland,
 };
