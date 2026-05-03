@@ -19,6 +19,7 @@ import {
   ExportPngButton,
   Footer,
   ITCZStepParamsSliders,
+  KeyboardShortcuts,
   Legend,
   LoadingIndicator,
   MapCanvas,
@@ -161,6 +162,7 @@ export function App() {
       </main>
       <Footer />
       <Toast />
+      <KeyboardShortcuts />
     </div>
   );
 }

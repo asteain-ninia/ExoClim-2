@@ -4,6 +4,7 @@
 export { CollapsibleSection } from './CollapsibleSection';
 export { ExportPngButton } from './ExportPngButton';
 export { Footer } from './Footer';
+export { KeyboardShortcuts } from './KeyboardShortcuts';
 export { LoadingIndicator } from './LoadingIndicator';
 export { ResetButton } from './ResetButton';
 export { SettingsIoButtons } from './SettingsIoButtons';

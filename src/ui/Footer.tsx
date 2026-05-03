@@ -26,6 +26,11 @@ export function Footer() {
           Worldbuilding Pasta
         </a>
       </span>
+      <span className="app__footer-sep">·</span>
+      <span className="app__footer-item">
+        キー: <code>0</code>=年平均 <code>1</code>=1月 <code>2</code>=4月{' '}
+        <code>3</code>=7月 <code>4</code>=10月
+      </span>
     </footer>
   );
 }
