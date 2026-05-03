@@ -105,6 +105,21 @@ body {
 
 /* 凡例パネル（.param-group を継承し、リスト構造のみ追加） */
 
+.legend-panel__group-title {
+  margin: 12px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8aa0b8;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  border-bottom: 1px dashed #2a4055;
+  padding-bottom: 2px;
+}
+
+.legend-panel__group-title:first-of-type {
+  margin-top: 4px;
+}
+
 .legend-panel__list {
   list-style: none;
   margin: 0;
