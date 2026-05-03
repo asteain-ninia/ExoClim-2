@@ -1319,12 +1319,12 @@ function drawMap(
     drawOverlayBitmap(ctx, precipitationBitmap, norm);
   }
   // 気候帯 overlay（陸地のみ、Köppen 配色）— 最終出力なので半透明度高めで主役表示。
-  // [P4-61] 1° per-cell の「カックカク」感緩和のため bilinear smoothing を有効化。
-  // 純色境界が薄くブレンドされて 1260×630 上で滑らかに見える。代償として境界の
-  // intermediate ピクセルが Köppen 配色テーブルに無い色になるが、視覚的には自然
-  // （実 Earth Köppen マップの遷移帯と同じ印象）。
+  // [P4-71 revert] P4-61 で bilinear smoothing 有効化していたが、ユーザ指摘の
+  // 「カックカク」は zone 境界が緯度 step 関数で角ばる問題であり pixel aliasing
+  // ではなかった（dot 可視化は OK、ルール離散性が真因）。smoothing が境界に
+  // テーブル外の色を生み判別不能にするため、original の sharp pixel に戻す。
   if (legendVisibility.climateZones && climateZoneBitmap) {
-    drawOverlayBitmap(ctx, climateZoneBitmap, norm, true);
+    drawOverlayBitmap(ctx, climateZoneBitmap, norm);
   }
   // 沿岸湧昇マスク（陸海の上、海氷の下、シアン半透明）
   if (legendVisibility.coastalUpwelling && coastalUpwellingBitmap) {
