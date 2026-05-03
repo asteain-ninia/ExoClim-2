@@ -528,11 +528,78 @@ export function computeClimateZone(
     applyBsRingAroundBw(zoneCodes);
   }
 
+  // §4.1.9 [P4-79] Climate clash 検出。隣接セルとの気候群レベル差 ≥ 3
+  // (例: A↔D, A↔E, B↔E) を clash として mask 化。Pasta WL#40 最終 step。
+  const { climateClashMask, climateClashCount } = computeClimateClash(zoneCodes);
+
   return {
     system: params.system,
     zoneCodes: zoneCodes as GridMap<ClimateZoneCode | null>,
     rationale: rationale as GridMap<ClimateZoneRationale | null>,
+    climateClashMask: climateClashMask as GridMap<boolean>,
+    climateClashCount,
   };
+}
+
+/**
+ * 気候群レベル: A=0 (Tropical) / B=1 (Arid) / C=2 (Temperate) /
+ * D=3 (Continental) / E=4 (Polar)。隣接 group はレベル差 1 で natural、
+ * 飛び級（差 ≥ 3）は clash として検知。
+ */
+function climateGroupLevel(code: string | null): number | null {
+  if (!code) return null;
+  const c = code[0];
+  if (c === 'A') return 0;
+  if (c === 'B') return 1;
+  if (c === 'C') return 2;
+  if (c === 'D') return 3;
+  if (c === 'E') return 4;
+  return null;
+}
+
+/**
+ * Climate clash 検出（[P4-79]、Pasta §4.1.9）。
+ * 各陸セルで 4 近傍に「気候群レベル差 ≥ 3」のセルがあれば clash 判定。
+ * 戻り値: マスク + 総数。
+ */
+function computeClimateClash(
+  zoneCodes: ReadonlyArray<ReadonlyArray<ClimateZoneCode | null>>,
+): { readonly climateClashMask: boolean[][]; readonly climateClashCount: number } {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const mask: boolean[][] = new Array(rows);
+  for (let i = 0; i < rows; i++) mask[i] = new Array<boolean>(cols).fill(false);
+  let count = 0;
+  const neighbors: ReadonlyArray<readonly [number, number]> = [
+    [0, 1],
+    [0, -1],
+    [1, 0],
+    [-1, 0],
+  ];
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const z = zoneCodes[i]?.[j];
+      const myLevel = climateGroupLevel(z);
+      if (myLevel === null) continue;
+      let clash = false;
+      for (const [di, dj] of neighbors) {
+        const ni = i + di;
+        if (ni < 0 || ni >= rows) continue;
+        const nj = ((j + dj) % cols + cols) % cols;
+        const nLevel = climateGroupLevel(zoneCodes[ni]?.[nj] ?? null);
+        if (nLevel === null) continue;
+        if (Math.abs(myLevel - nLevel) >= 3) {
+          clash = true;
+          break;
+        }
+      }
+      if (clash) {
+        mask[i]![j] = true;
+        count++;
+      }
+    }
+  }
+  return { climateClashMask: mask, climateClashCount: count };
 }
 
 /**

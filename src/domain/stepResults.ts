@@ -227,6 +227,15 @@ export interface ClimateZoneResult {
   readonly zoneCodes: GridMap<ClimateZoneCode | null>;
   /** 各陸地セルの判定根拠（海洋セルは null）。 */
   readonly rationale: GridMap<ClimateZoneRationale | null>;
+  /**
+   * Climate clash mask（[Pasta §4.1.9]、[P4-79]）。
+   * 隣接セルとの「気候群レベル差 ≥ 3」を持つ陸セルを true にマーク。
+   * 例: A 群（lvl 0）と D 群（lvl 3）が隣接 → clash。中間の B/C を skip しているため。
+   * 海セル・未分類は false。
+   */
+  readonly climateClashMask: GridMap<boolean>;
+  /** clash count（陸地セルのうち clash と判定されたものの総数）。品質指標 */
+  readonly climateClashCount: number;
 }
 
 // ============================================================
