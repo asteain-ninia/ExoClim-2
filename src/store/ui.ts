@@ -81,6 +81,12 @@ export interface UIState {
    * UI 側は LoadingIndicator コンポーネントで購読してスピナー表示の判定に使う。
    */
   readonly isComputing: boolean;
+  /**
+   * 上級モード（[現状.md §6 U19]、P4-43 追加）。
+   * `true` で全スライダー表示、`false` で `advanced` フラグ付きスライダーを非表示。
+   * 既定 `false`（初心者向けに UI を簡潔に保つ）。
+   */
+  readonly advancedMode: boolean;
 }
 
 export interface UIActions {
@@ -92,6 +98,8 @@ export interface UIActions {
   readonly setHoveredCell: (cell: HoveredCell | null) => void;
   /** pipeline 計算中フラグを更新する（[P4-34]）。 */
   readonly setIsComputing: (computing: boolean) => void;
+  /** 上級モードを切替える（[P4-43]）。 */
+  readonly setAdvancedMode: (enabled: boolean) => void;
   readonly reset: () => void;
 }
 
@@ -120,6 +128,7 @@ const INITIAL_UI_STATE: UIState = {
   },
   hoveredCell: null,
   isComputing: false,
+  advancedMode: false,
 };
 
 export const createUIStore = () =>
@@ -133,6 +142,7 @@ export const createUIStore = () =>
       })),
     setHoveredCell: (cell) => set({ hoveredCell: cell }),
     setIsComputing: (isComputing) => set({ isComputing }),
+    setAdvancedMode: (advancedMode) => set({ advancedMode }),
     reset: () => set(INITIAL_UI_STATE),
   }));
 

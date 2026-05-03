@@ -81,4 +81,21 @@ describe('store/ui: UI 状態 store', () => {
       expect(store.getState().isComputing).toBe(false);
     });
   });
+
+  describe('setAdvancedMode ([P4-43])', () => {
+    it('初期値は false（初心者向けに UI を簡潔に保つ）', () => {
+      expect(store.getState().advancedMode).toBe(false);
+    });
+    it('true / false を切替えできる', () => {
+      store.getState().setAdvancedMode(true);
+      expect(store.getState().advancedMode).toBe(true);
+      store.getState().setAdvancedMode(false);
+      expect(store.getState().advancedMode).toBe(false);
+    });
+    it('reset で false に戻る', () => {
+      store.getState().setAdvancedMode(true);
+      store.getState().reset();
+      expect(store.getState().advancedMode).toBe(false);
+    });
+  });
 });

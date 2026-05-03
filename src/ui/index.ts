@@ -1,6 +1,7 @@
 // UI 層エントリポイント。
 // マップ表示・グラフ・パラメータ調整 UI・デバッグビューを集約する（[技術方針.md §2.1.5]）。
 
+export { AdvancedModeToggle } from './AdvancedModeToggle';
 export { CollapsibleSection } from './CollapsibleSection';
 export { ExportPngButton } from './ExportPngButton';
 export { Footer } from './Footer';

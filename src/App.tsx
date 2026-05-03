@@ -11,6 +11,7 @@ import {
   useUIStore,
 } from '@/store';
 import {
+  AdvancedModeToggle,
   AirflowStepParamsSliders,
   AtmosphereOceanSliders,
   CellInspector,
@@ -63,6 +64,7 @@ export function App() {
           </div>
           <div className="app__header-actions">
             <LoadingIndicator />
+            <AdvancedModeToggle />
             <ExportPngButton />
             <SettingsIoButtons />
             <ResetButton />

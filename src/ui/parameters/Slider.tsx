@@ -2,6 +2,8 @@
 // 仕様: [要件定義書.md §2.3.6] パラメータ調整 UI / [§3.4] 操作様式（連続値）。
 // 規約: HTML range input をラップし、ラベル・現在値・地球プリセット復帰ボタンを併設する。
 
+import { useUIStore } from '@/store/ui';
+
 interface SliderProps {
   /** input 要素の id（ラベルとの関連付けと data-testid の組成に使う）。 */
   readonly id: string;
@@ -25,6 +27,12 @@ interface SliderProps {
    * ネイティブツールチップ表示。spec 引用や Pasta 出典を入れる用途。
    */
   readonly helpText?: string;
+  /**
+   * 上級モード時のみ表示する詳細スライダー（[現状.md §6 U19]、P4-43）。
+   * `true` で `advancedMode` が false のとき非表示。物理シミュ結果を直接体感しない
+   * 高度なチューニング系（streamline サンプル数、agent 速度、curvature など）に付与。
+   */
+  readonly advanced?: boolean;
   readonly onChange: (value: number) => void;
 }
 
@@ -39,8 +47,11 @@ export function Slider({
   precision = 2,
   defaultValue,
   helpText,
+  advanced,
   onChange,
 }: SliderProps) {
+  const advancedMode = useUIStore((s) => s.advancedMode);
+  if (advanced && !advancedMode) return null;
   const formattedValue = value.toFixed(precision);
   return (
     <div className="slider">

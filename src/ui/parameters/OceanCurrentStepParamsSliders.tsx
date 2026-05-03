@@ -49,6 +49,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.coastalInfluenceRangeDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.coastalInfluenceRangeDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ coastalInfluenceRangeDeg: v })}
       />
       <Slider
@@ -103,6 +104,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.seaIceColdCurrentExtensionMinLatDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.seaIceColdCurrentExtensionMinLatDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ seaIceColdCurrentExtensionMinLatDeg: v })}
       />
       <Slider
@@ -115,6 +117,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.seaIceColdCurrentExtensionCoastalProximityDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.seaIceColdCurrentExtensionCoastalProximityDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ seaIceColdCurrentExtensionCoastalProximityDeg: v })}
       />
       <Slider
@@ -127,6 +130,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.basinCenterNeutralWidthDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.basinCenterNeutralWidthDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ basinCenterNeutralWidthDeg: v })}
       />
       <Slider
@@ -139,6 +143,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={0}
         value={oceanCurrentParams.streamlineBasinMinWidthDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.streamlineBasinMinWidthDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ streamlineBasinMinWidthDeg: v })}
       />
       <Slider
@@ -187,6 +192,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={0}
         value={oceanCurrentParams.streamlineSamplesPerEdge}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.streamlineSamplesPerEdge}
+        advanced
         onChange={(v) => setOceanCurrentParams({ streamlineSamplesPerEdge: v })}
       />
       <Slider
@@ -199,6 +205,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.streamlineCurvatureDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.streamlineCurvatureDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ streamlineCurvatureDeg: v })}
       />
       <Slider
@@ -211,6 +218,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={0}
         value={oceanCurrentParams.streamlineDeflectionRangeCells}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.streamlineDeflectionRangeCells}
+        advanced
         onChange={(v) => setOceanCurrentParams({ streamlineDeflectionRangeCells: v })}
       />
       <Slider
@@ -223,6 +231,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.streamlineMaxDeflectionDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.streamlineMaxDeflectionDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ streamlineMaxDeflectionDeg: v })}
       />
       <div className="param-toggle">
@@ -264,6 +273,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.agentBaseSpeedDegPerStep}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.agentBaseSpeedDegPerStep}
+        advanced
         onChange={(v) => setOceanCurrentParams({ agentBaseSpeedDegPerStep: v })}
       />
       <div className="param-toggle">
@@ -305,6 +315,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.ensoLatitudeRangeDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.ensoLatitudeRangeDeg}
+        advanced
         onChange={(v) => setOceanCurrentParams({ ensoLatitudeRangeDeg: v })}
       />
     </fieldset>

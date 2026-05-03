@@ -86,6 +86,33 @@ body {
   gap: 12px;
 }
 
+.app__advanced-toggle {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: #1a2c3d;
+  color: #a8b8c8;
+  border: 1px solid #4a6075;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.app__advanced-toggle:hover {
+  background: #2a4055;
+}
+
+.app__advanced-toggle--on {
+  background: #2d3f5a;
+  border-color: #ffd060;
+  color: #ffe090;
+}
+
+.app__advanced-toggle--on:hover {
+  background: #3a4d6a;
+}
+
 .app__export-btn {
   flex: 0 0 auto;
   padding: 8px 14px;

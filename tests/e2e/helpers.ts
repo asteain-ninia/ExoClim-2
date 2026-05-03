@@ -19,3 +19,18 @@ export async function openAllCollapsibleSections(page: Page): Promise<void> {
     }
   });
 }
+
+/**
+ * 上級モード（U19、P4-43）を ON にする。
+ *
+ * 既定 OFF のため `advanced` フラグ付きスライダー（海流 streamline 系・agent 系・
+ * ENSO 緯度範囲など）が画面に存在しない。これらにアクセスする E2E は
+ * `beforeEach` で本ヘルパを呼ぶこと。トグルが既に ON なら何もしない。
+ */
+export async function enableAdvancedMode(page: Page): Promise<void> {
+  const toggle = page.getByTestId('app-advanced-mode-toggle');
+  const pressed = await toggle.getAttribute('aria-pressed');
+  if (pressed !== 'true') {
+    await toggle.click();
+  }
+}

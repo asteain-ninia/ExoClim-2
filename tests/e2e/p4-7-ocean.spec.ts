@@ -2,7 +2,7 @@
 // 仕様: [docs/spec/03_海流.md §4 / §5] / [要件定義書.md §2.2.3]。
 
 import { expect, test, type Page } from '@playwright/test';
-import { openAllCollapsibleSections } from './helpers';
+import { enableAdvancedMode, openAllCollapsibleSections } from './helpers';
 
 async function setRangeValue(page: Page, testId: string, value: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el, v) => {
@@ -59,6 +59,9 @@ test.describe('P4-7: Step 3 海流', () => {
     // Step 5 (P4-9) を pipeline に追加して初期計算が長くなったため十分な待機を取る。
     await page.waitForTimeout(900);
     await openAllCollapsibleSections(page);
+    // P4-43: advanced=true な海流 streamline / agent / ENSO 緯度範囲 / 詳細な
+    // 沿岸 / 海洋盆チューニング系スライダーは既定で非表示なので有効化する。
+    await enableAdvancedMode(page);
   });
 
   test('Step 3 海流パネル（13 スライダー + 寒流延長 / ENSO トグル）が表示される', async ({ page }) => {
