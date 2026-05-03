@@ -14,6 +14,7 @@ import {
   CellInspector,
   ClimateZoneStepParamsSliders,
   CollapsibleSection,
+  Footer,
   ITCZStepParamsSliders,
   Legend,
   MapCanvas,
@@ -100,6 +101,7 @@ export function App() {
           </CollapsibleSection>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
