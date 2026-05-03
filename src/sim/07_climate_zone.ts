@@ -190,6 +190,14 @@ export interface ClimateZoneStepParams {
    */
   readonly mediterraneanWestCoastForceEnabled: boolean;
   /**
+   * §4.1.4 西岸海洋性 Cfb wedge 強制を有効化するか（[P4-83]、subagent eval 2026-05-04）。
+   *
+   * lat 45-60° 大陸西岸 (海から ≤ 5 cells) の D 群 (Dfb/Dfc) セルを Cfb に
+   * 強制振り直し。Pasta WL#37 模式図の「西岸海洋性気候 wedge」(Ireland/UK/Pacific NW
+   * analog) を確保する。既定 true。
+   */
+  readonly cfbWestCoastForceEnabled: boolean;
+  /**
    * §4.1.8 中緯度西岸 desert 海岸延長を有効化するか（[P4-81]）。
    *
    * 約 lat ±18-25° の大陸西岸では、暖流海岸 wet が desert を浸食しすぎる
@@ -219,6 +227,7 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   equatorialAfProtectEnabled: true,
   equatorialAfProtectLatDeg: 5,
   mediterraneanWestCoastForceEnabled: true,
+  cfbWestCoastForceEnabled: true,
   westCoastDesertExtensionEnabled: true,
 };
 
@@ -597,6 +606,12 @@ export function computeClimateZone(
   if (params.mediterraneanWestCoastForceEnabled) {
     applyMediterraneanWestCoastForce(zoneCodes, grid);
   }
+  // §4.1.4 [P4-83] 西岸海洋性 Cfb wedge 強制。subagent eval 2026-05-04「Cfb=300
+  // 過少」対応。lat 45-60° 西岸の D 群 (Dfb/Dfc) セルを Cfb に振り直し、
+  // Ireland/UK/Pacific NW analog の「西岸海洋性気候 wedge」を確保する。
+  if (params.cfbWestCoastForceEnabled) {
+    applyCfbWestCoastForce(zoneCodes, grid);
+  }
   // §4.1.8 [P4-81] 中緯度西岸 desert 海岸延長。約 lat ±18-25° の大陸西岸では
   // BWh/BSh が海岸まで届くべきところを暖流海岸 wet が浸食してしまう。
   // 海岸セル（西岸）が BWh/BSh の隣接にあり、現在 A/C 群なら BSh に振り直す。
@@ -810,6 +825,59 @@ function applyMediterraneanWestCoastForce(
         codeRow[j] = 'Csa';
       } else if (cur === 'Cfb' || cur === 'Cwb' || cur === 'Cfc' || cur === 'BWk' || cur === 'BSk') {
         codeRow[j] = 'Csb';
+      }
+    }
+  }
+}
+
+/**
+ * §4.1.4 西岸海洋性 Cfb wedge 強制（[P4-83]、subagent eval 2026-05-04）。
+ *
+ * lat 45-60° の大陸西岸 (lon-1〜-5 のいずれかが海) で、現コードが D 群
+ * (Dfb/Dfc/Dwb/Dwc) のセルを Cfb に振り直す。Pasta WL#37 模式図の「西岸
+ * 海洋性気候 wedge」(Ireland/UK/Pacific NW analog) を確保する。
+ *
+ * 暖流海岸が冬を温めて winterMin ≥ -3°C にするのが本来の物理だが、Step 5
+ * の coastal correction inland reach (1100 km) では届かない緯度帯がある
+ * ため post-processing で補正。Cfa は対象外（C 群はそのまま維持）。
+ *
+ * 入力 `zoneCodes` を in-place 改変する。
+ */
+function applyCfbWestCoastForce(
+  zoneCodes: (ClimateZoneCode | null)[][],
+  grid: Grid,
+): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const LAT_MIN = 45;
+  const LAT_MAX = 60;
+  const COAST_REACH_CELLS = 5;
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const codeRow = zoneCodes[i]!;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      const absLat = Math.abs(cell.latitudeDeg);
+      if (absLat < LAT_MIN || absLat > LAT_MAX) continue;
+      // 西岸判定: lon-1〜lon-5 のいずれかが海セル
+      let isWestCoast = false;
+      for (let dc = 1; dc <= COAST_REACH_CELLS; dc++) {
+        const njW = (j - dc + cols) % cols;
+        const wCell = cellRow[njW];
+        if (!wCell) continue;
+        if (!wCell.isLand) {
+          isWestCoast = true;
+          break;
+        }
+      }
+      if (!isWestCoast) continue;
+      const cur = codeRow[j];
+      if (!cur) continue;
+      // D 群 humid continental / subarctic を Cfb に振り直し
+      if (cur === 'Dfb' || cur === 'Dfc' || cur === 'Dwb' || cur === 'Dwc') {
+        codeRow[j] = 'Cfb';
       }
     }
   }
