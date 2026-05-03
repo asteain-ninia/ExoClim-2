@@ -43,7 +43,11 @@ const POLAR_SUMMER_MAX_THRESHOLD_CELSIUS = 10;
 /** ET / EF の境界（夏 ≥ 0°C → ET、< 0°C → EF）。 */
 const ET_EF_BOUNDARY_CELSIUS = 0;
 /** Continental (D) と Temperate (C) の境界（冬 < 0°C → D、≥ 0°C → C）。 */
-const D_C_WINTER_BOUNDARY_CELSIUS = 0;
+// [P4-68] お手本（清書版）の Cfb wedge 西岸 30-55° 縦長帯を実現するため、
+// Pasta WL#40 厳格版 0°C → 標準 Köppen の -3°C に緩和。 winterMin が
+// -3 ≤ < 18°C を C 群とする。Pasta `Worldbuilder's Log #40` でも一部の
+// バージョンでは -3°C 採用とあり、両方の妥当性あり。
+const D_C_WINTER_BOUNDARY_CELSIUS = -3;
 /** Tropical (A) の冬最低気温下限（[§4.1.1] 冬 ≥ 18°C → A）。 */
 const TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS = 18;
 /** 第 3 文字 'a' の最暖月しきい値（[§4.1.6] ≥ 22°C）。 */

@@ -158,9 +158,10 @@ export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   snowIceFeedbackIterations: 2,
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
-  // [P4-57] 5 → 7 に増加。Pasta WL#28 の「数百 km 内陸まで」記述を 700-800 km
-  // (= 7-8°) でカバー。Cfb wedge が西岸 50°N で 1-2 セルしか出ない問題を緩和。
-  coastalCorrectionInlandReachCells: 7,
+  // [P4-57/68] 7 → 10 に増加。Pasta WL#28「数百 km 内陸まで」+ お手本（清書版）の
+  // 西岸 Cfb wedge を実現するため。10° ≈ 1100 km は西岸海洋性気候の最大幅
+  // （Pacific NW / 北欧の Cfb 帯）にほぼ整合。
+  coastalCorrectionInlandReachCells: 10,
 };
 
 /**
