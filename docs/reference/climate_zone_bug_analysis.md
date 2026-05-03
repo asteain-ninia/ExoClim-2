@@ -8,12 +8,46 @@
 出力の差分を、Step 7 (`src/sim/07_climate_zone.ts`) と上流 Step 5/6 を読んで
 切り分けた結果を残す。**修正は次サイクル以降**で実施する。
 
-## 結論サマリ
+## 結論サマリ（P4-48 診断スクリプト実行結果で更新）
 
 | 症状 | 根本原因の所在 |
 |---|---|
-| 東西対称性が崩れない | **上流（Step 5 気温 / Step 6 降水）** |
-| 赤道帯が C 群支配 | **Step 7 のしきい値（特に line 412）** + 上流 Step 5 の winterMin |
+| 東西対称性が崩れない | **半分上流、半分 Step 7**: Step 5 は coast 直近の land cell で東西差 6°C 程度を出すが、内陸では一様。Step 7 の class 境界（C/A は 18°C しきい）は超えないので可視ラベルが同じ |
+| 赤道帯が C 群支配 | **主に Step 7 line 412**: 赤道直下 lowland でも winterMin が 13-18°C となり、`< 18` で C 群に流れる。標準 Köppen 仕様だが Pasta `Aw 拡張` は適用されていない |
+
+## 診断スクリプト結果（P4-48、`scripts/diag_temperature_asymmetry.mts`）
+
+仮想大陸 `idealized_continent` プリセットで Step 1-5 を実行し、北緯 30°行を
+10 経度サンプリングした winterMin（最寒月平均気温）:
+
+```text
+idx  lonDeg  land  oceanCorr@cell  oceanCorr@nearestSea  winterMin  classification
+106   -73.5    L          0.00              -9.00           4.59°C   cold (west coast)
+122   -57.5    L          0.00              -9.00           0.03°C   neutral
+138   -41.5    L          0.00               0.00          -0.12°C   neutral
+155   -24.5    L          0.00               0.00          -0.12°C   neutral
+171    -8.5    L          0.00               0.00          -0.12°C   neutral
+188     8.5    L          0.00               0.00          -0.12°C   neutral
+204    24.5    L          0.00               0.00          -0.12°C   neutral
+221    41.5    L          0.00               0.00          -0.12°C   neutral
+237    57.5    L          0.00              13.50          -0.12°C   neutral
+254    74.5    L          0.00              13.50          10.97°C   warm (east coast)
+```
+
+- 30°N West coast: winterMin = 4.59°C（寒流の影響、cold）
+- 30°N East coast: winterMin = 10.97°C（暖流の影響、warm）
+- Δ(east - west) = **+6.38°C**（東岸が暖かい、物理的に正しい方向性）
+- ただし内陸 8 セル（lon -57.5〜57.5）はすべて winterMin = -0.12°C で完全一致
+- 10°N でも同様: West 12.88°C / East 17.57°C / Δ = +4.69°C
+
+**つまり東西非対称性は存在する**。問題は:
+1. **影響が浅い**: coastal correction が edge cell（経度差 4° 以内）にしか
+   届かない（`applyWindAdvection` でわずかにブレンドされる程度）
+2. **境界しきい値を超えない**: 最寒月 4.59°C も 10.97°C も「< 18°C」なので
+   Step 7 で同じ「C 群」に分類される
+
+つまりユーザの「同緯度東西で同色」は、**温度差が C/A 境界の 18°C を跨がないために
+気候帯ラベルが同一になる**現象。微妙な温度差は per-cell には存在する。
 
 ## バグ 1: 東西対称性が崩れない
 
