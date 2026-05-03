@@ -22,6 +22,7 @@ import {
   CellInspector,
   ClimateZoneStepParamsSliders,
   CollapsibleSection,
+  ColorLegend,
   ExportPngButton,
   Footer,
   HelpButton,
@@ -149,6 +150,13 @@ export function App() {
         <section className="controls-section">
           <CollapsibleSection title="表示トグル" testId="section-legend" initiallyOpen>
             <Legend />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="色凡例"
+            testId="section-color-legend"
+            initiallyOpen={false}
+          >
+            <ColorLegend />
           </CollapsibleSection>
           <CollapsibleSection
             title="セル情報"

@@ -3,6 +3,7 @@
 
 export { CANVAS_HEIGHT_PX, CANVAS_WIDTH_PX, MapCanvas } from './MapCanvas';
 export { CellInspector } from './CellInspector';
+export { ColorLegend } from './ColorLegend';
 export { Legend } from './Legend';
 export { SeasonSelector } from './SeasonSelector';
 export type { CanvasViewport } from './projections';

@@ -1085,6 +1085,47 @@ body {
   line-height: 1.4;
 }
 
+/* === Color legend ([現状.md §6 U3]、P4-66) === */
+
+.color-legend__group {
+  margin-top: 8px;
+}
+
+.color-legend__group > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+
+.color-legend__list {
+  list-style: none;
+  margin: 4px 0 8px 8px;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.color-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.color-legend__swatch {
+  display: inline-block;
+  width: 22px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.color-legend__label {
+  color: var(--text-primary);
+}
+
 /* セル情報パネル（マウスオーバー時の詳細表示） */
 
 .cell-inspector__list {
