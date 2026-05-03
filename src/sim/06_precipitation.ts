@@ -743,12 +743,12 @@ export function computePrecipitation(
         //   ITCZ + onshore海岸 → wet
         //   亜熱帯高気圧帯 (lat 25–35°、陸地) → dry
         //   それ以外 → normal
-        // §4.x [P4-53] 寒流隣接 dry 帯: lat 10-30° 西岸（cold current が
+        // §4.x [P4-53/P4-77] 寒流隣接 dry 帯: lat **18-30°** 西岸（cold current が
         // adjacent ocean に発生する位置）の land は dry。Sahara / Atacama analog。
-        // 既存の subtropical high (25-35°) と組み合わせて lat 10-35° の
-        // west coast / interior が dry → BWh の必要条件 (annual precip 低) を満たす
+        // P4-77 subagent 評価で「BW/BS が赤道側 lat 5-25° に侵入しすぎ」指摘:
+        // 旧 lat 10-30° → lat 18-30° に絞り、lat 10-18° は Aw / Af に明け渡す。
         let coldCurrentDry = false;
-        if (cell.isLand && absLat >= 10 && absLat <= 30) {
+        if (cell.isLand && absLat >= 18 && absLat <= 30) {
           const monthCorr = oceanCurrentResult.monthlyCoastalTemperatureCorrectionCelsius[m];
           // 4 近傍に cold current 海セル (correction < -2°C) があるか
           const adjs: ReadonlyArray<readonly [number, number]> = [
@@ -877,11 +877,13 @@ export function computePrecipitation(
         } else if (isMediterraneanWinterWet) {
           // [P4-70] 地中海性気候 西岸 30-42° 冬季 wet（地中海/CA/チリ analog）
           labelRow[j] = 'wet';
+        } else if (inITCZ && absLat < 8) {
+          // [P4-54/P4-77] ITCZ 圏内の対流性降水: 赤道帯（lat<8°）で very_wet
+          // （P4-77 subagent 評価「Af 帯消失」を解消するため、normal 60mm
+          // → very_wet 240mm に底上げして driestMonth ≥ 60 を保証 → Af 分類）。
+          labelRow[j] = 'very_wet';
         } else if (inITCZ && absLat < 15) {
-          // [P4-54] ITCZ 圏内の対流性降水: 深熱帯（lat<15°）に限定。
-          // 暖流wet/orographic がなくとも 'wet'。lat 15° 以上は影響帯端で
-          // 雨量薄く normal のままにし、亜熱帯高気圧帯（25-35°）の dry を
-          // 食い潰さないようにする
+          // lat 8-15° は wet（年中ではないが ITCZ が overhead する月で）
           labelRow[j] = 'wet';
         } else if (
           cell.isLand &&
