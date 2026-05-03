@@ -152,6 +152,28 @@ function generateEarthStatisticConstrainedTerrain(
  *   [docs/spec/](../../docs/spec/) の仮想大陸ケースに使う。
  */
 function generateIdealizedContinentTerrain(rows: number, cols: number): TerrainData {
+  return generateIdealizedContinentInternal(rows, cols, false);
+}
+
+/**
+ * NH/SH 対称版（[P4-77/P4-78] subagent 評価で「大陸 NH/SH 非対称、お手本 schematic
+ * と乖離」指摘あり、Pasta お手本（仮想大陸清書版）の symmetric kite を再現）。
+ *
+ * Earth 統計（NH 側に land 偏在）の代わりに、NH/SH の land fraction 平均を使用。
+ * NH/SH で同じ width の kite が出る。
+ */
+function generateIdealizedContinentSymmetricTerrain(
+  rows: number,
+  cols: number,
+): TerrainData {
+  return generateIdealizedContinentInternal(rows, cols, true);
+}
+
+function generateIdealizedContinentInternal(
+  rows: number,
+  cols: number,
+  symmetrize: boolean,
+): TerrainData {
   const total = rows * cols;
   const isLand = new Array<boolean>(total).fill(false);
   const elevationMeters = new Array<number>(total).fill(-4000);
@@ -159,8 +181,17 @@ function generateIdealizedContinentTerrain(rows: number, cols: number): TerrainD
 
   for (let r = 0; r < rows; r++) {
     const latDeg = -90 + (r + 0.5) * (180 / rows);
-    const stats = getEarthStatisticsAt(latDeg);
-    const landCount = Math.floor(stats.landFraction * cols);
+    let landFraction: number;
+    if (symmetrize) {
+      // |lat| で NH と SH の平均 land fraction を取る
+      const absLat = Math.abs(latDeg);
+      const nhStat = getEarthStatisticsAt(absLat);
+      const shStat = getEarthStatisticsAt(-absLat);
+      landFraction = (nhStat.landFraction + shStat.landFraction) / 2;
+    } else {
+      landFraction = getEarthStatisticsAt(latDeg).landFraction;
+    }
+    const landCount = Math.floor(landFraction * cols);
 
     const colDistances: { c: number; dist: number }[] = new Array(cols);
     for (let c = 0; c < cols; c++) {
@@ -208,8 +239,11 @@ export function buildTerrainGrid(
           terrain = generateEarthStatisticConstrainedTerrain(rows, cols, 0, 1.0);
           break;
         case 'idealized_continent':
-        case 'idealized_continent_2':
           terrain = generateIdealizedContinentTerrain(rows, cols);
+          break;
+        case 'idealized_continent_2':
+          // [P4-78] NH/SH 対称版（お手本 schematic kite に近い）
+          terrain = generateIdealizedContinentSymmetricTerrain(rows, cols);
           break;
         case 'no_land':
           terrain = generateAllOceanTerrain(rows, cols);

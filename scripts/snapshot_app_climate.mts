@@ -68,7 +68,10 @@ const KOPPEN: Record<string, [number, number, number]> = {
 };
 
 console.log('Running pipeline on idealized_continent ...');
-// [P4-72] resolution 1 を渡さない (default 0.5 を使う)
+// [P4-72] resolution 1 を渡さない (default 0.5 を使う)。
+// preset は idealized_continent (Earth 統計準拠の非対称 kite、お手本一致)。
+// idealized_continent_2 (NH/SH 対称版) も P4-78 で実装済みだが、お手本
+// (geographico) 自体が非対称なのでデフォルトは非対称を採用。
 const grid = buildTerrainGrid({ kind: 'preset', presetId: 'idealized_continent' });
 const itcz = computeITCZ(EARTH_PLANET_PARAMS, grid, DEFAULT_ITCZ_STEP_PARAMS);
 const windBelt = computeWindBelt(
