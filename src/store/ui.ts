@@ -58,6 +58,12 @@ export interface LegendVisibility {
   readonly precipitationLabels: boolean;
   /** Step 7 気候帯 overlay 表示トグル（Köppen-Geiger 配色）。 */
   readonly climateZones: boolean;
+  /**
+   * Step 7 Climate clash mask overlay 表示トグル（[Pasta §4.1.9]、[P4-79]）。
+   * 隣接気候群レベル差 ≥ 3 の不自然な急変セルを赤いハッチで強調表示。
+   * 既定 OFF（診断用、利用者が必要時に ON）。
+   */
+  readonly climateClash: boolean;
 }
 
 /**
@@ -145,6 +151,7 @@ const INITIAL_UI_STATE: UIState = {
     isotherms: true,           // 等温線（既定 ON、地形を阻害せず温度勾配を読み取れる）
     precipitationLabels: false, // 降水ラベル overlay（既定 OFF、地形が見えなくなるため）
     climateZones: false,        // 気候帯 overlay（既定 OFF、地形が見えなくなるため）
+    climateClash: false,        // 気候 clash mask（既定 OFF、診断用）
   },
   hoveredCell: null,
   isComputing: false,

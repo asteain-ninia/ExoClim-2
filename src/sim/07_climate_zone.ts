@@ -578,7 +578,7 @@ function computeClimateClash(
   ];
   for (let i = 0; i < rows; i++) {
     for (let j = 0; j < cols; j++) {
-      const z = zoneCodes[i]?.[j];
+      const z = zoneCodes[i]?.[j] ?? null;
       const myLevel = climateGroupLevel(z);
       if (myLevel === null) continue;
       let clash = false;

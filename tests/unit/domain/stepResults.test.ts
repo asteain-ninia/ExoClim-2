@@ -272,6 +272,8 @@ describe('domain/stepResults: Step 結果型と SimulationResult', () => {
         system: 'koppen_geiger',
         zoneCodes: codeGrid,
         rationale: rationaleGrid,
+        climateClashMask: makeGridMap(2, 2, false),
+        climateClashCount: 0,
       };
       expect(result.zoneCodes[0]?.[0]).toBe('Af');
       expect(result.zoneCodes[0]?.[1]).toBeNull();
@@ -340,6 +342,8 @@ describe('domain/stepResults: Step 結果型と SimulationResult', () => {
           system: 'koppen_geiger',
           zoneCodes: [[null]],
           rationale: [[null]],
+          climateClashMask: [[false]],
+          climateClashCount: 0,
         },
       };
       const keys = Object.keys(result).sort();

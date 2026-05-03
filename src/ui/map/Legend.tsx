@@ -250,6 +250,20 @@ export function Legend() {
             気候帯（Köppen-Geiger）
           </label>
         </li>
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={legendVisibility.climateClash}
+              onChange={(e) =>
+                setLegendVisibility({ climateClash: e.target.checked })
+              }
+              data-testid="legend-climate-clash"
+            />
+            <span className="legend-swatch legend-swatch--climate-clash" aria-hidden="true" />
+            気候急変セル（clash 検知、診断用）
+          </label>
+        </li>
       </ul>
 
       <p className="legend-panel__note">

@@ -691,6 +691,53 @@ function buildClimateZoneBitmap(
   return off;
 }
 
+/**
+ * Climate clash mask overlay ビットマップを構築する（[Pasta §4.1.9]、[P4-79b]）。
+ *
+ * `climateClashMask[i][j] === true` のセルを赤の対角ハッチで強調する。
+ * 「気候群レベル差 ≥ 3 が隣接する」という Pasta WL#40 の品質指標を地図上で
+ * 一目で確認できるよう、診断用に半透明 overlay として描く。clash count が
+ * 0 なら全透明（off canvas）。
+ */
+function buildClimateClashBitmap(
+  mask: ReadonlyArray<ReadonlyArray<boolean>> | null,
+  grid: Grid,
+): HTMLCanvasElement | null {
+  if (!mask) return null;
+  const cols = grid.longitudeCount;
+  const rows = grid.latitudeCount;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const offCtx = off.getContext('2d');
+  if (!offCtx) return off;
+
+  const imgData = offCtx.createImageData(cols, rows);
+  const data = imgData.data;
+
+  // 対角ハッチ判定: (x + y) % 2 で 1 セル単位に縞模様（low res なので
+  // ハッチが粗くなりがちだが、診断 overlay としては十分視認性高い）。
+  for (let r = 0; r < rows; r++) {
+    const row = mask[r];
+    if (!row) continue;
+    const imageY = rows - 1 - r;
+    for (let c = 0; c < cols; c++) {
+      if (!row[c]) continue;
+      const offset = (imageY * cols + c) * 4;
+      // セル単位での赤マーキング（255, 50, 50, alpha）
+      // 隣接 alpha を交互に変えて目立たせる（密集 clash を識別しやすく）
+      const alpha = (imageY + c) % 2 === 0 ? 220 : 140;
+      data[offset] = 255;
+      data[offset + 1] = 50;
+      data[offset + 2] = 50;
+      data[offset + 3] = alpha;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  return off;
+}
+
 /** 海氷の表示用フェード幅（°）。しきい値の前後 SEA_ICE_FADE_WIDTH_DEG で α を線形補間する。 */
 const SEA_ICE_FADE_WIDTH_DEG = 5;
 /** 海氷の最大不透明度（α 1 のときの最終 alpha 値、255 中）。 */
@@ -1280,6 +1327,7 @@ function drawMap(
   temperatureBitmap: HTMLCanvasElement | null,
   precipitationBitmap: HTMLCanvasElement | null,
   climateZoneBitmap: HTMLCanvasElement | null,
+  climateClashBitmap: HTMLCanvasElement | null,
   influenceBandBitmap: HTMLCanvasElement | null,
   centerLineBands: readonly BandPoint[] | null,
   windField: GridMap<WindVector> | null,
@@ -1325,6 +1373,11 @@ function drawMap(
   // テーブル外の色を生み判別不能にするため、original の sharp pixel に戻す。
   if (legendVisibility.climateZones && climateZoneBitmap) {
     drawOverlayBitmap(ctx, climateZoneBitmap, norm);
+  }
+  // Climate clash overlay（[Pasta §4.1.9]、[P4-79b]）— 気候帯 overlay の上に
+  // 重ね、急変セルを赤で診断的に強調表示する。診断用なので既定 OFF。
+  if (legendVisibility.climateClash && climateClashBitmap) {
+    drawOverlayBitmap(ctx, climateClashBitmap, norm);
   }
   // 沿岸湧昇マスク（陸海の上、海氷の下、シアン半透明）
   if (legendVisibility.coastalUpwelling && coastalUpwellingBitmap) {
@@ -1471,6 +1524,15 @@ export function MapCanvas() {
   // 気候帯 overlay ビットマップ（climateZone + grid 依存、季節非依存）
   const climateZoneBitmap = useMemo(
     () => (climateZone && grid ? buildClimateZoneBitmap(climateZone, grid) : null),
+    [climateZone, grid],
+  );
+
+  // Climate clash overlay ビットマップ（[P4-79b]、climateZone.climateClashMask 依存）
+  const climateClashBitmap = useMemo(
+    () =>
+      climateZone && grid
+        ? buildClimateClashBitmap(climateZone.climateClashMask, grid)
+        : null,
     [climateZone, grid],
   );
 
@@ -1666,6 +1728,7 @@ export function MapCanvas() {
       temperatureBitmap,
       precipitationBitmap,
       climateZoneBitmap,
+      climateClashBitmap,
       influenceBandBitmap,
       bands,
       windField,
@@ -1689,6 +1752,7 @@ export function MapCanvas() {
     temperatureBitmap,
     precipitationBitmap,
     climateZoneBitmap,
+    climateClashBitmap,
     influenceBandBitmap,
     bands,
     windField,
