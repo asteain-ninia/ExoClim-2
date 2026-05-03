@@ -86,6 +86,24 @@ body {
   gap: 12px;
 }
 
+.app__export-btn {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: #1a2c3d;
+  color: #d8e6f4;
+  border: 1px solid #4a6075;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.app__export-btn:hover {
+  background: #2a4055;
+  border-color: #6090c0;
+}
+
 /* === Loading indicator ([現状.md §6 U12]) === */
 
 .loading-indicator {

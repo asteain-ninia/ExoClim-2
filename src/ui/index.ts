@@ -2,6 +2,7 @@
 // マップ表示・グラフ・パラメータ調整 UI・デバッグビューを集約する（[技術方針.md §2.1.5]）。
 
 export { CollapsibleSection } from './CollapsibleSection';
+export { ExportPngButton } from './ExportPngButton';
 export { Footer } from './Footer';
 export { LoadingIndicator } from './LoadingIndicator';
 export { ResetButton } from './ResetButton';

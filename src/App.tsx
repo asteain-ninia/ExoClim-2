@@ -16,6 +16,7 @@ import {
   CellInspector,
   ClimateZoneStepParamsSliders,
   CollapsibleSection,
+  ExportPngButton,
   Footer,
   ITCZStepParamsSliders,
   Legend,
@@ -60,6 +61,7 @@ export function App() {
           </div>
           <div className="app__header-actions">
             <LoadingIndicator />
+            <ExportPngButton />
             <ResetButton />
           </div>
         </div>
