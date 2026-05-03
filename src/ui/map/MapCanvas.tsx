@@ -1591,7 +1591,12 @@ export function MapCanvas() {
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
       const drag = dragRef.current;
       if (drag) {
-        const dx = e.clientX - drag.startClientX;
+        // CSS でスケールダウンされている場合、screen px → internal canvas px に
+        // 換算しないと pan の感覚速度がスケール比だけ遅くなる（[現状.md §6 U8]、P4-46）
+        const canvas = e.currentTarget;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+        const dx = (e.clientX - drag.startClientX) * scaleX;
         setPanOffsetPx(drag.startOffset + dx);
         return;
       }
@@ -1695,9 +1700,14 @@ export function MapCanvas() {
       data-testid="map-canvas"
       style={{
         display: 'block',
-        // grid 親に潰されないよう CSS でも固定サイズを強制（[要件定義書.md §2.3.1]）
-        width: `${CANVAS_WIDTH_PX}px`,
-        height: `${CANVAS_HEIGHT_PX}px`,
+        // 1260×630 を内部解像度として保持しつつ、CSS では viewport 幅まで縮小可
+        // 表示（モバイル横画面 720px 以下の overflow 対策、[現状.md §6 U8]、P4-46）。
+        // pointer 座標は CSS サイズ基準で来るので、handler 側で内部解像度に
+        // スケール変換する必要あり（getBoundingClientRect で取得済み）。
+        width: '100%',
+        maxWidth: `${CANVAS_WIDTH_PX}px`,
+        height: 'auto',
+        aspectRatio: `${CANVAS_WIDTH_PX} / ${CANVAS_HEIGHT_PX}`,
         cursor: 'grab',
         border: '1px solid #2a4055',
         background: '#0e2233',

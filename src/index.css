@@ -131,6 +131,37 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* モバイルではボタンが多いため折り返し許可（[現状.md §6 U8]、P4-46） */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .app__header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .app__header-actions {
+    justify-content: flex-start;
+  }
+  .app__header-actions > button,
+  .app__header-actions > div > button {
+    /* 小画面でタップしやすいよう padding を増やす */
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding: 8px;
+  }
+  .app__header h1 {
+    font-size: 1.2rem;
+  }
+  .app__header p {
+    font-size: 0.8rem;
+  }
 }
 
 .app__advanced-toggle {

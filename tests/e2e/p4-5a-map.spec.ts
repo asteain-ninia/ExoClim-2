@@ -46,12 +46,21 @@ test.describe('P4-5a Canvas 2D マップビュー', () => {
     await openAllCollapsibleSections(page);
   });
 
-  test('Canvas が固定サイズ（1260x630）で表示される（[要件定義書.md §2.3.1]）', async ({ page }) => {
+  test('Canvas が想定アスペクト比 (2:1) で表示され viewport を超えない（[要件定義書.md §2.3.1] / P4-46 レスポンシブ）', async ({ page }) => {
     const canvas = page.locator('[data-testid="map-canvas"]');
     await expect(canvas).toBeVisible();
     const box = await canvas.boundingBox();
-    expect(box?.width).toBe(1260);
-    expect(box?.height).toBe(630);
+    // 内部解像度は常に 1260×630（DOM 属性）
+    const internal = await canvas.evaluate((el) => ({
+      w: (el as HTMLCanvasElement).width,
+      h: (el as HTMLCanvasElement).height,
+    }));
+    expect(internal.w).toBe(1260);
+    expect(internal.h).toBe(630);
+    // CSS 上は viewport に応じて縮小（max-width: 1260px）。アスペクト比は維持
+    expect(box?.width).toBeLessThanOrEqual(1260);
+    expect(box?.width).toBeGreaterThan(400);
+    expect(box!.width / box!.height).toBeCloseTo(2, 1);
   });
 
   test('表示トグルパネルが常時表示される（[要件定義書.md §2.3.2]）', async ({ page }) => {
