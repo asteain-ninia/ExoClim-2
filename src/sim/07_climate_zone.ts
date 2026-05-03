@@ -130,6 +130,23 @@ export interface ClimateZoneStepParams {
    * 既定 7°C は地球の北米/ユーラシア大陸の Bsk/BWk と D 群の境界経験値。
    */
   readonly aridReclassToDMaxAnnualTempCelsius: number;
+  /**
+   * §4.1.5 拡張: 標準 Köppen の A 群条件「最寒月 ≥ 18°C」を緩めて、
+   * 「年平均 ≥ X°C かつ winterMin ≥ Y°C」のときは A 群（tropical）として扱う
+   * （[現状.md ユーザ指摘 2026-05-03、P4-49]、Pasta `Worldbuilder's Log #40` 由来）。
+   *
+   * 動機: Step 5 の per-cell winterMin が赤道帯 lowland でも 13-17°C 程度に
+   * 留まり（[scripts/diag_temperature_asymmetry.mts] 結果）、標準 Köppen
+   * では C 群に流れてしまう。Pasta では「年平均が常時暖かいゾーン」を
+   * 保守的に A 群へ引き戻すことで、視覚的な「赤道帯 = A 群」を維持する。
+   *
+   * 既定 true / annualMean ≥ 22°C / winterMin ≥ 10°C （地球の Aw/Cwa 境界経験値）。
+   */
+  readonly tropicalExtensionEnabled: boolean;
+  /** A 群拡張: 年平均気温の下限（°C）。 */
+  readonly tropicalExtensionMinAnnualMeanCelsius: number;
+  /** A 群拡張: winterMin の下限（°C）。これより寒い冬を持つセルは拡張対象外。 */
+  readonly tropicalExtensionMinWinterMinCelsius: number;
 }
 
 export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
@@ -143,6 +160,9 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   aridHotColdCriterion: 'monthly',
   aridReclassToDEnabled: true,
   aridReclassToDMaxAnnualTempCelsius: 7,
+  tropicalExtensionEnabled: true,
+  tropicalExtensionMinAnnualMeanCelsius: 22,
+  tropicalExtensionMinWinterMinCelsius: 10,
 };
 
 /** 月別気温・降水量の集約結果。 */
@@ -409,10 +429,22 @@ function classifyCell(
       code = classifyArid(agg, aridThreshold, params.aridHotColdCriterion);
     } else if (agg.winterMinCelsius < D_C_WINTER_BOUNDARY_CELSIUS) {
       code = classifyContinental(agg);
-    } else if (agg.winterMinCelsius < TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS) {
-      code = classifyTemperate(agg);
     } else {
-      code = classifyTropical(agg);
+      // §4.1.5 A 群拡張（[P4-49]）: 標準では winterMin ≥ 18°C で A 群だが、
+      // Step 5 の per-cell winterMin が低めに出るため、年平均が十分暖かい
+      // ゾーンを救済して A 群へ振り分ける。Pasta `Worldbuilder's Log #40` 風。
+      const isTropicalExtension =
+        params.tropicalExtensionEnabled &&
+        agg.annualMeanCelsius >= params.tropicalExtensionMinAnnualMeanCelsius &&
+        agg.winterMinCelsius >= params.tropicalExtensionMinWinterMinCelsius;
+      if (
+        agg.winterMinCelsius < TROPICAL_WINTER_MIN_THRESHOLD_CELSIUS &&
+        !isTropicalExtension
+      ) {
+        code = classifyTemperate(agg);
+      } else {
+        code = classifyTropical(agg);
+      }
     }
   }
   const rationale: ClimateZoneRationale = {

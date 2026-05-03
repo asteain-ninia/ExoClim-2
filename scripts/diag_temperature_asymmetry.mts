@@ -19,16 +19,12 @@ import { buildTerrainGrid } from '../src/domain/terrain';
 import { EARTH_PLANET_PARAMS } from '../src/domain';
 import { computeITCZ, DEFAULT_ITCZ_STEP_PARAMS } from '../src/sim/01_itcz';
 import { computeWindBelt, DEFAULT_WIND_BELT_STEP_PARAMS } from '../src/sim/02_wind_belt';
-import {
-  computeOceanCurrent,
-  DEFAULT_OCEAN_CURRENT_STEP_PARAMS,
-} from '../src/sim/03_ocean_current';
+import { computeOceanCurrent } from '../src/sim/03_ocean_current';
 import { computeAirflow, DEFAULT_AIRFLOW_STEP_PARAMS } from '../src/sim/04_airflow';
 import { computeTemperature, DEFAULT_TEMPERATURE_STEP_PARAMS } from '../src/sim/05_temperature';
 
 console.log('Generating idealized continent terrain ...');
 const grid = buildTerrainGrid({ kind: 'preset', presetId: 'idealized_continent' }, 1);
-const rows = grid.latitudeCount;
 const cols = grid.longitudeCount;
 
 console.log('Running Step 1-5 pipeline ...');
@@ -124,7 +120,7 @@ for (const c of samplePositions) {
     }
   }
   // Classification at nearest sea cell
-  let classCount = { warm: 0, cold: 0, neutral: 0 };
+  const classCount = { warm: 0, cold: 0, neutral: 0 };
   for (let dc = -3; dc <= 3; dc++) {
     const nc = ((c + dc) % cols + cols) % cols;
     if (grid.cells[r]![nc]!.isLand) continue;

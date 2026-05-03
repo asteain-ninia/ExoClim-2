@@ -140,6 +140,63 @@ export function ClimateZoneStepParamsSliders() {
         helpText="年平均気温がこの値以下なら、低降水量でも乾燥扱いせず D 群（亜寒帯/大陸性）に振り戻す（既定 7°C、Worldbuilder's Log #40）。"
         onChange={(v) => setClimateZoneParams({ aridReclassToDMaxAnnualTempCelsius: v })}
       />
+      <div className="param-toggle">
+        <span className="param-toggle__label">A 群拡張（赤道帯救済、[P4-49]）</span>
+        <div className="param-toggle__buttons">
+          <button
+            type="button"
+            className={
+              climateZoneParams.tropicalExtensionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() => setClimateZoneParams({ tropicalExtensionEnabled: true })}
+            data-testid="climate-zone-tropical-ext-on"
+          >
+            有効
+          </button>
+          <button
+            type="button"
+            className={
+              !climateZoneParams.tropicalExtensionEnabled
+                ? 'param-toggle__btn param-toggle__btn--active'
+                : 'param-toggle__btn'
+            }
+            onClick={() => setClimateZoneParams({ tropicalExtensionEnabled: false })}
+            data-testid="climate-zone-tropical-ext-off"
+          >
+            無効
+          </button>
+        </div>
+      </div>
+      <Slider
+        id="climate-zone-tropical-ext-mean"
+        label="A 群拡張 年平均気温の下限"
+        unit="°C"
+        min={15}
+        max={28}
+        step={0.5}
+        precision={1}
+        value={climateZoneParams.tropicalExtensionMinAnnualMeanCelsius}
+        defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.tropicalExtensionMinAnnualMeanCelsius}
+        helpText="年平均気温がこの値以上のとき winterMin<18°C でも A 群へ振り分ける（既定 22°C、Pasta WL#40 由来）。"
+        advanced
+        onChange={(v) => setClimateZoneParams({ tropicalExtensionMinAnnualMeanCelsius: v })}
+      />
+      <Slider
+        id="climate-zone-tropical-ext-winter"
+        label="A 群拡張 winterMin の下限"
+        unit="°C"
+        min={0}
+        max={18}
+        step={0.5}
+        precision={1}
+        value={climateZoneParams.tropicalExtensionMinWinterMinCelsius}
+        defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.tropicalExtensionMinWinterMinCelsius}
+        helpText="A 群拡張の最寒月平均下限（既定 10°C）。これより寒い冬を持つセルは拡張対象外で C 群のまま。"
+        advanced
+        onChange={(v) => setClimateZoneParams({ tropicalExtensionMinWinterMinCelsius: v })}
+      />
     </fieldset>
   );
 }

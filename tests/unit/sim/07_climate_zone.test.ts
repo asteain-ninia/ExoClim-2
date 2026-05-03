@@ -422,6 +422,44 @@ describe('sim/07_climate_zone: パラメータ依存', () => {
     expect(result.code.startsWith('B')).toBe(true);
   });
 
+  it('§4.1.5 A 群拡張 [P4-49]: 年平均 25°C / winterMin 15°C のセル（標準では C 群）が拡張で A 群に', () => {
+    // winterMin=15 < 18 なので標準 Köppen では C 群、annualMean=25 ≥ 22 で A 群拡張対象
+    const tropicalLowlandAgg = makeAgg({
+      monthlyT: [22, 23, 25, 28, 30, 30, 28, 27, 26, 25, 23, 15], // winterMin=15, annualMean≈25.2
+      monthlyP: [120, 110, 100, 80, 60, 50, 40, 50, 80, 100, 120, 130], // 年 1040mm
+    });
+    const enabled = __internals.classifyCell(tropicalLowlandAgg, DEFAULT_CLIMATE_ZONE_STEP_PARAMS);
+    expect(enabled.code.startsWith('A')).toBe(true);
+    const disabled = __internals.classifyCell(tropicalLowlandAgg, {
+      ...DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
+      tropicalExtensionEnabled: false,
+    });
+    expect(disabled.code.startsWith('C')).toBe(true);
+  });
+
+  it('§4.1.5 A 群拡張: winterMin=8°C は下限 10°C 未満なので拡張対象外、C 群のまま', () => {
+    const borderlineAgg = makeAgg({
+      monthlyT: [20, 21, 23, 25, 27, 28, 27, 26, 25, 23, 20, 8], // winterMin=8, annualMean≈22.75
+      monthlyP: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
+    });
+    const result = __internals.classifyCell(borderlineAgg, DEFAULT_CLIMATE_ZONE_STEP_PARAMS);
+    expect(result.code.startsWith('C')).toBe(true);
+  });
+
+  it('§4.1.5 A 群拡張: 標準 A 条件（winterMin ≥ 18°C）を満たすセルは拡張の有無に関わらず A 群', () => {
+    const trueTropicalAgg = makeAgg({
+      monthlyT: [22, 23, 24, 25, 26, 26, 26, 25, 24, 23, 22, 22], // winterMin=22
+      monthlyP: [200, 180, 150, 120, 100, 80, 80, 100, 150, 180, 200, 220],
+    });
+    const enabled = __internals.classifyCell(trueTropicalAgg, DEFAULT_CLIMATE_ZONE_STEP_PARAMS);
+    const disabled = __internals.classifyCell(trueTropicalAgg, {
+      ...DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
+      tropicalExtensionEnabled: false,
+    });
+    expect(enabled.code.startsWith('A')).toBe(true);
+    expect(disabled.code.startsWith('A')).toBe(true);
+  });
+
   it('aridHotColdCriterion を annual に切替えても 4 階調コードが返る', () => {
     const grid = mapGridCells(baseGrid(), (cell) =>
       Math.abs(cell.latitudeDeg) <= 40 && cell.longitudeDeg >= 0 && cell.longitudeDeg <= 30
