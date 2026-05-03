@@ -15,6 +15,7 @@ import {
 import type { PipelineBridge } from '@/worker/bridge';
 import { deepEqual } from '@/worker/deepEqual';
 import type { PipelineInputs } from '@/worker/pipeline';
+import type { NotificationsStore } from './notifications';
 import type { ParamsStore } from './params';
 import type { ResultsStore } from './results';
 
@@ -30,6 +31,11 @@ export interface ConnectStoresOptions {
    * 通常の利用では指定しない。
    */
   readonly grid?: Grid;
+  /**
+   * notifications store。bridge エラーを toast に流すために使う（[現状.md §6 U20]、P4-33）。
+   * 指定なしならエラーは console.error のみ。
+   */
+  readonly notificationsStore?: StoreApi<NotificationsStore>;
 }
 
 /**
@@ -103,6 +109,15 @@ export function connectStoresToBridge(
     }
   };
 
+  // bridge のエラーを notifications store に流す
+  const unsubscribeError = bridge.onError((message) => {
+    if (options.notificationsStore) {
+      options.notificationsStore.getState().push('error', message);
+    } else {
+      console.error('[bridge error]', message);
+    }
+  });
+
   // 初回実行（現在の params で results を埋める）
   void runPipelineFromCurrentParams();
 
@@ -111,5 +126,10 @@ export function connectStoresToBridge(
     void runPipelineFromCurrentParams();
   });
 
-  return { dispose: unsubscribe };
+  return {
+    dispose: () => {
+      unsubscribe();
+      unsubscribeError();
+    },
+  };
 }

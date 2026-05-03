@@ -34,6 +34,16 @@ export interface PipelineBridge {
   readonly run: (inputs: PipelineInputs) => Promise<PipelineOutput>;
   /** 内部資源を解放する。Worker は terminate、直接モードは cache をリセット。 */
   readonly dispose: () => void;
+  /**
+   * エラーハンドラを登録する（[現状.md §6 U20]、P4-33 追加）。
+   *
+   * Worker bridge: worker の `error` / `messageerror` イベント、および pipeline の
+   *   実行例外を捕捉して呼ぶ。
+   * 直接 bridge: runPipeline の例外を捕捉して呼ぶ。
+   *
+   * 戻り値はリスナー解除関数。
+   */
+  readonly onError: (handler: (message: string) => void) => () => void;
 }
 
 /**
@@ -42,14 +52,28 @@ export interface PipelineBridge {
  */
 export function createDirectPipelineBridge(): PipelineBridge {
   let cache: PipelineCache = EMPTY_PIPELINE_CACHE;
+  const errorHandlers = new Set<(message: string) => void>();
   return {
     run: (inputs) => {
-      const result = runPipeline(inputs, cache);
-      cache = result.cache;
-      return Promise.resolve(result.output);
+      try {
+        const result = runPipeline(inputs, cache);
+        cache = result.cache;
+        return Promise.resolve(result.output);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        for (const h of errorHandlers) h(msg);
+        return Promise.reject(e instanceof Error ? e : new Error(msg));
+      }
     },
     dispose: () => {
       cache = EMPTY_PIPELINE_CACHE;
+      errorHandlers.clear();
+    },
+    onError: (handler) => {
+      errorHandlers.add(handler);
+      return () => {
+        errorHandlers.delete(handler);
+      };
     },
   };
 }
@@ -107,6 +131,11 @@ export function createWorkerPipelineBridge(): PipelineBridge {
    */
   let lastSentGrid: Grid | null = null;
   const pendingRequests = new Map<number, (output: PipelineOutput) => void>();
+  const errorHandlers = new Set<(message: string) => void>();
+
+  const fireError = (message: string): void => {
+    for (const h of errorHandlers) h(message);
+  };
 
   worker.addEventListener('message', (e: MessageEvent<WorkerOutboundMessage>) => {
     const { id, output } = e.data;
@@ -115,6 +144,17 @@ export function createWorkerPipelineBridge(): PipelineBridge {
       pendingRequests.delete(id);
       resolver(output);
     }
+  });
+
+  // Worker 内例外（非同期で捕捉できないもの）。message と filename / lineno を整形。
+  worker.addEventListener('error', (e: ErrorEvent) => {
+    const msg = e.message || 'Worker 内で未捕捉エラー';
+    fireError(`Worker エラー: ${msg}${e.filename ? ` (${e.filename}:${e.lineno})` : ''}`);
+  });
+
+  // postMessage の serialization 失敗（循環参照など）。
+  worker.addEventListener('messageerror', () => {
+    fireError('Worker からの応答メッセージが解読できませんでした');
   });
 
   return {
@@ -148,7 +188,14 @@ export function createWorkerPipelineBridge(): PipelineBridge {
     dispose: () => {
       worker.terminate();
       pendingRequests.clear();
+      errorHandlers.clear();
       lastSentGrid = null;
+    },
+    onError: (handler) => {
+      errorHandlers.add(handler);
+      return () => {
+        errorHandlers.delete(handler);
+      };
     },
   };
 }

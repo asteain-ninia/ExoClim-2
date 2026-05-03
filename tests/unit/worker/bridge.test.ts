@@ -74,4 +74,23 @@ describe('worker/bridge: createDirectPipelineBridge', () => {
     // dispose で cache がリセットされたため、同じ入力でも初回扱い
     expect(after.cacheHits.itcz).toBe(false);
   });
+
+  it('onError: handler を登録できる（[P4-33]）', () => {
+    bridge = createDirectPipelineBridge();
+    const unsubscribe = bridge.onError(() => {});
+    expect(typeof unsubscribe).toBe('function');
+    unsubscribe();
+  });
+
+  it('onError: 解除関数を呼んでも例外を投げない', () => {
+    bridge = createDirectPipelineBridge();
+    const unsubscribe = bridge.onError(() => {});
+    expect(() => unsubscribe()).not.toThrow();
+    // 二重解除も安全
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
+  // 注: pipeline の実例外フローは現行の domain/sim 実装が空 grid を許容するため、
+  // unit test で再現困難。実際の Worker bridge 経由のエラー伝播は dev 環境で手動確認
+  // （[現状.md §6 U20] / 実装済み.md P4-33 「ユーザフィードバック反映」参照）。
 });

@@ -4,6 +4,7 @@
 export { CollapsibleSection } from './CollapsibleSection';
 export { Footer } from './Footer';
 export { ResetButton } from './ResetButton';
+export { Toast } from './Toast';
 
 export {
   CANVAS_HEIGHT_PX,

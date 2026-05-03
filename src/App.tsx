@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import {
   connectStoresToBridge,
+  useNotificationsStore,
   useParamsStore,
   useResultsStore,
 } from '@/store';
@@ -26,6 +27,7 @@ import {
   SeasonSelector,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,
+  Toast,
   WindBeltStepParamsSliders,
 } from '@/ui';
 import { createWorkerPipelineBridge } from '@/worker';
@@ -33,7 +35,9 @@ import { createWorkerPipelineBridge } from '@/worker';
 export function App() {
   useEffect(() => {
     const bridge = createWorkerPipelineBridge();
-    const { dispose } = connectStoresToBridge(useParamsStore, useResultsStore, bridge);
+    const { dispose } = connectStoresToBridge(useParamsStore, useResultsStore, bridge, {
+      notificationsStore: useNotificationsStore,
+    });
     return () => {
       dispose();
       bridge.dispose();
@@ -102,6 +106,7 @@ export function App() {
         </section>
       </main>
       <Footer />
+      <Toast />
     </div>
   );
 }

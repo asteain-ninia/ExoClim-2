@@ -19,3 +19,12 @@ export { createUIStore, useUIStore } from './ui';
 
 export type { ConnectStoresOptions } from './connection';
 export { connectStoresToBridge } from './connection';
+
+export type {
+  Notification,
+  NotificationLevel,
+  NotificationsActions,
+  NotificationsState,
+  NotificationsStore,
+} from './notifications';
+export { createNotificationsStore, useNotificationsStore } from './notifications';
