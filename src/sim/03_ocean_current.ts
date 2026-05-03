@@ -719,20 +719,24 @@ function generateEquatorialCountercurrent(
 /**
  * 全海洋盆について衝突点を生成する（[docs/spec/03_海流.md §4.5 / §4.6]）。
  *
- * 1 盆 × 2 半球 × 2 種類 = 4 衝突点を出力:
- *   - `equatorial_current`: 赤道流（lat ±eqLat）が大陸西岸（basin 西縁）で衝突し、西岸境界流に転向する起点
- *   - `polar_current`: 極側流（lat ±polarLat）が polar easterlies で西進し、basin 西縁で陸に衝突する点
+ * 1 盆 × 2 半球 × 3 種類 = 6 衝突点（[P4-80] で mid_latitude_branching 追加）:
+ *   - `equatorial_current`: 赤道流（lat ±eqLat）が basin 西縁の大陸西岸で衝突
+ *   - `polar_current`: 極側流（lat ±polarLat）が polar easterlies で西進し basin 西縁で衝突
+ *   - `mid_latitude_branching`: 西岸境界流が basin 東縁の大陸東岸（lat ±midLatitudeDeg）に
+ *     衝突し、(a) 赤道方向（東岸境界流） / (b) 極方向（極流）の 2 経路に分岐する点
+ *     ([Pasta §4.5] の「Where it [the boundary current] hits the eastern side of the basin,
+ *     it'll split」)。順行: basin 東縁 (endLonDeg)、逆行: basin 西縁 (startLonDeg) で
+ *     反転（[§4.9]）。
  *
- * 順行: basin の西縁 (startLonDeg) が衝突側。逆行 ([§4.9]) では東縁 (endLonDeg) が衝突側に反転。
- *
- * 中緯度 (lat ±midLat) での 2 分岐衝突点 ([§4.5] の東岸再衝突) は CollisionPointType の
- * 既定 2 種に含まれないため最小実装では出力しない（[現状.md §既知の未対応事項]）。
+ * 順行: basin の西縁 (startLonDeg) が equatorial / polar 衝突側、東縁 (endLonDeg) が mid-lat
+ * 分岐側。逆行ではすべて反転。
  */
 function buildAllCollisionPoints(
   grid: Grid,
   rotationSign: 1 | -1,
   basinMinWidthDeg: number,
   equatorialLatDeg: number,
+  midLatitudeDeg: number,
   polarLatitudeDeg: number,
 ): CollisionPoint[] {
   const equatorIndex = Math.round((0 + 90) / grid.resolutionDeg - 0.5);
@@ -740,6 +744,10 @@ function buildAllCollisionPoints(
   const result: CollisionPoint[] = [];
   for (const basin of basins) {
     const westernBoundaryLon = rotationSign === 1 ? basin.startLonDeg : basin.endLonDeg;
+    // 中緯度分岐点は basin の「東縁」（順行: endLonDeg / 逆行: startLonDeg）。
+    // snapToSeaCellLon に渡す rotationSign を反転すると、海側を逆方向（西側）
+    // に探索することになる（東縁は陸の西側に海がある）。
+    const easternBoundaryLon = rotationSign === 1 ? basin.endLonDeg : basin.startLonDeg;
     for (const hemisphereSign of [1, -1] as const) {
       // ±equatorialLat 行では大陸形状が equator 行と異なり、basin 西縁経度の
       // セルが陸であることがある。海側（順行=東 / 逆行=西）にスナップして
@@ -772,6 +780,24 @@ function buildAllCollisionPoints(
           position: {
             latitudeDeg: hemisphereSign * polarLatitudeDeg,
             longitudeDeg: polarLon,
+          },
+        });
+      }
+      // [P4-80] 中緯度分岐点: basin 東縁の lat ±midLatitudeDeg。
+      // snapToSeaCellLon の rotationSign を反転して「東側に陸、西側に海」の
+      // 配置を探す（東縁衝突 → 海側は西）。
+      const midLon = snapToSeaCellLon(
+        grid,
+        hemisphereSign * midLatitudeDeg,
+        easternBoundaryLon,
+        rotationSign === 1 ? -1 : 1,
+      );
+      if (midLon !== null) {
+        result.push({
+          type: 'mid_latitude_branching',
+          position: {
+            latitudeDeg: hemisphereSign * midLatitudeDeg,
+            longitudeDeg: midLon,
           },
         });
       }
@@ -1782,6 +1808,7 @@ export function computeOceanCurrent(
     rotationSign,
     params.streamlineBasinMinWidthDeg,
     params.streamlineEquatorialLatDeg,
+    params.streamlineMidLatitudeDeg,
     params.streamlinePolarLatitudeDeg,
   );
 

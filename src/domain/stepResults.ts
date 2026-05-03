@@ -74,8 +74,17 @@ export interface CurrentStreamline {
   readonly path: ReadonlyArray<GeoPoint>;
 }
 
-/** 海流の衝突点種別（赤道流の沿岸衝突 / 極向き流の極域衝突）。 */
-export type CollisionPointType = 'equatorial_current' | 'polar_current';
+/**
+ * 海流の衝突点種別（[docs/spec/03_海流.md §4.5 / §4.6]）。
+ *   - `equatorial_current`: 赤道流が basin 西縁の大陸西岸で衝突し境界流に分岐
+ *   - `polar_current`: 極向き流が basin 西縁の大陸で衝突
+ *   - `mid_latitude_branching`: 中緯度（lat ±30°）で赤道流帯由来の流線が basin 東縁の
+ *     大陸東岸に衝突して再分岐する点（[Pasta §4.5]、[P4-80]）
+ */
+export type CollisionPointType =
+  | 'equatorial_current'
+  | 'polar_current'
+  | 'mid_latitude_branching';
 
 export interface CollisionPoint {
   readonly type: CollisionPointType;

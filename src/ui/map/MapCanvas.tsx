@@ -1230,6 +1230,7 @@ function drawCurrentStreamlines(
 /** 衝突点を 3 オフセットで丸マーカーとして描画する（[docs/spec/03_海流.md §4.5 / §4.6]）。
  *  - equatorial_current: 黄色（暖流分岐の起点、赤道流→西岸境界流）
  *  - polar_current: 紫色（極流が陸に衝突して終端）
+ *  - mid_latitude_branching: シアン（西岸境界流が basin 東縁で 2 経路に分岐、[P4-80]）
  */
 function drawCollisionPoints(
   ctx: CanvasRenderingContext2D,
@@ -1237,7 +1238,12 @@ function drawCollisionPoints(
   normPanPx: number,
 ): void {
   for (const point of collisions) {
-    const fillStyle = point.type === 'equatorial_current' ? '#ffd040' : '#c060ff';
+    const fillStyle =
+      point.type === 'equatorial_current'
+        ? '#ffd040'
+        : point.type === 'polar_current'
+          ? '#c060ff'
+          : '#40ffd0'; // mid_latitude_branching: シアン
     ctx.fillStyle = fillStyle;
     ctx.strokeStyle = '#202028';
     ctx.lineWidth = 1;

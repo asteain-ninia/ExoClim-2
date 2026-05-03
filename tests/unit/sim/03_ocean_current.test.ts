@@ -62,9 +62,9 @@ describe('sim/03_ocean_current: computeOceanCurrent 出力構造', () => {
     expect(result.monthlySeaIceMask.length).toBe(12);
     expect(result.monthlyCoastalTemperatureCorrectionCelsius.length).toBe(12);
     expect(result.monthlyCollisionPoints.length).toBe(12);
-    // 1 盆あたり 4 衝突点（2 半球 × 2 種類）。全海洋では 1 盆 → 4 衝突点
+    // [P4-80] 1 盆あたり 6 衝突点（2 半球 × 3 種類: equatorial / polar / mid_latitude_branching）。
     for (const month of result.monthlyCollisionPoints) {
-      expect(month.length).toBe(4);
+      expect(month.length).toBe(6);
     }
     expect(result.ensoDipoleCandidateMask.length).toBe(grid.latitudeCount);
   });
@@ -1053,10 +1053,11 @@ describe('sim/03_ocean_current: 衝突点（[docs/spec/03_海流.md §4.5 / §4.
       baseWindBelt(EARTH_PLANET_PARAMS, grid),
     );
     const month = result.monthlyCollisionPoints[0]!;
-    expect(month.length).toBe(4);
+    // [P4-80] 1 盆 × 2 半球 × 3 種類（equatorial / polar / mid_latitude_branching）= 6 点。
+    expect(month.length).toBe(6);
   });
 
-  it('順行 NH の衝突点は basin の西縁（経度 -180°）にある', () => {
+  it('順行 NH の equatorial / polar 衝突点は basin の西縁（経度 -180°）にある', () => {
     const grid = baseGrid(2);
     const result = computeOceanCurrent(
       EARTH_PLANET_PARAMS,
@@ -1065,13 +1066,14 @@ describe('sim/03_ocean_current: 衝突点（[docs/spec/03_海流.md §4.5 / §4.
       baseWindBelt(EARTH_PLANET_PARAMS, grid),
     );
     const month = result.monthlyCollisionPoints[0]!;
-    // 全海洋なら basin = [-180, 180]、西縁 = -180
+    // 全海洋なら basin = [-180, 180]、西縁 = -180。中緯度分岐点は東縁なので除外。
     for (const p of month) {
+      if (p.type === 'mid_latitude_branching') continue;
       expect(p.position.longitudeDeg).toBeCloseTo(-180, 6);
     }
   });
 
-  it('赤道流衝突点は lat ±eqLat、極流衝突点は lat ±polarLat に配置される', () => {
+  it('赤道流衝突点は lat ±eqLat、極流衝突点は lat ±polarLat、中緯度分岐は lat ±midLat に配置される', () => {
     const grid = baseGrid(2);
     const result = computeOceanCurrent(
       EARTH_PLANET_PARAMS,
@@ -1082,21 +1084,28 @@ describe('sim/03_ocean_current: 衝突点（[docs/spec/03_海流.md §4.5 / §4.
     const month = result.monthlyCollisionPoints[0]!;
     const eqPoints = month.filter((p) => p.type === 'equatorial_current');
     const polarPoints = month.filter((p) => p.type === 'polar_current');
+    const midPoints = month.filter((p) => p.type === 'mid_latitude_branching');
     expect(eqPoints.length).toBe(2);
     expect(polarPoints.length).toBe(2);
-    // 既定 eqLat = 7°、polarLat = 80°
+    expect(midPoints.length).toBe(2);
+    // 既定 eqLat = 7°、polarLat = 80°、midLat = 32°
     for (const p of eqPoints) {
       expect(Math.abs(p.position.latitudeDeg)).toBeCloseTo(7, 6);
     }
     for (const p of polarPoints) {
       expect(Math.abs(p.position.latitudeDeg)).toBeCloseTo(80, 6);
     }
+    for (const p of midPoints) {
+      expect(Math.abs(p.position.latitudeDeg)).toBeCloseTo(32, 6);
+    }
     // 半球が NH と SH の両方に出ていること
     expect(eqPoints.some((p) => p.position.latitudeDeg > 0)).toBe(true);
     expect(eqPoints.some((p) => p.position.latitudeDeg < 0)).toBe(true);
+    expect(midPoints.some((p) => p.position.latitudeDeg > 0)).toBe(true);
+    expect(midPoints.some((p) => p.position.latitudeDeg < 0)).toBe(true);
   });
 
-  it('逆行惑星では衝突点が basin の東縁（経度 +180°）に反転する（[§4.9]）', () => {
+  it('逆行惑星では eq / polar 衝突点が basin の東縁（経度 +180°）に反転する（[§4.9]）', () => {
     const grid = baseGrid(2);
     const retrograde: PlanetParams = {
       ...EARTH_PLANET_PARAMS,
@@ -1109,8 +1118,13 @@ describe('sim/03_ocean_current: 衝突点（[docs/spec/03_海流.md §4.5 / §4.
       baseWindBelt(retrograde, grid),
     );
     const month = result.monthlyCollisionPoints[0]!;
+    // 逆行: equatorial / polar は東縁（+180°）、mid_latitude_branching は西縁（-180°）に反転。
     for (const p of month) {
-      expect(p.position.longitudeDeg).toBeCloseTo(180, 6);
+      if (p.type === 'mid_latitude_branching') {
+        expect(p.position.longitudeDeg).toBeCloseTo(-180, 6);
+      } else {
+        expect(p.position.longitudeDeg).toBeCloseTo(180, 6);
+      }
     }
   });
 

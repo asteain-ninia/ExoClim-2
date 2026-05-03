@@ -99,6 +99,8 @@ describe('domain/stepResults: Step 結果型と SimulationResult', () => {
             return 'eq';
           case 'polar_current':
             return 'po';
+          case 'mid_latitude_branching':
+            return 'mid';
         }
       };
       expect(classify('warm')).toBe('W');
