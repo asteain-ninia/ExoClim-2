@@ -1,6 +1,8 @@
 // UI 層エントリポイント。
 // マップ表示・グラフ・パラメータ調整 UI・デバッグビューを集約する（[技術方針.md §2.1.5]）。
 
+export { CollapsibleSection } from './CollapsibleSection';
+
 export {
   CANVAS_HEIGHT_PX,
   CANVAS_WIDTH_PX,

@@ -13,6 +13,7 @@ import {
   AtmosphereOceanSliders,
   CellInspector,
   ClimateZoneStepParamsSliders,
+  CollapsibleSection,
   ITCZStepParamsSliders,
   Legend,
   MapCanvas,
@@ -52,19 +53,45 @@ export function App() {
           <SeasonSelector />
         </section>
         <section className="controls-section">
-          <Legend />
-          <CellInspector />
-          <OrbitalSliders />
-          <PlanetBodySliders />
-          <AtmosphereOceanSliders />
-          <TerrainSourceSelector />
-          <ITCZStepParamsSliders />
-          <WindBeltStepParamsSliders />
-          <OceanCurrentStepParamsSliders />
-          <AirflowStepParamsSliders />
-          <TemperatureStepParamsSliders />
-          <PrecipitationStepParamsSliders />
-          <ClimateZoneStepParamsSliders />
+          <CollapsibleSection title="表示トグル" testId="section-legend">
+            <Legend />
+          </CollapsibleSection>
+          <CollapsibleSection title="セル情報" testId="section-cell-inspector">
+            <CellInspector />
+          </CollapsibleSection>
+          <CollapsibleSection title="軌道パラメータ" testId="section-orbital">
+            <OrbitalSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="惑星本体" testId="section-planet-body">
+            <PlanetBodySliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="大気・海洋" testId="section-atmosphere-ocean">
+            <AtmosphereOceanSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="地形" testId="section-terrain">
+            <TerrainSourceSelector />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 1 ITCZ 調整" testId="section-itcz">
+            <ITCZStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 2 風帯 調整" testId="section-wind-belt">
+            <WindBeltStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 3 海流 調整" testId="section-ocean-current">
+            <OceanCurrentStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 4 気流 調整" testId="section-airflow">
+            <AirflowStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 5 気温 調整" testId="section-temperature">
+            <TemperatureStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 6 降水 調整" testId="section-precipitation">
+            <PrecipitationStepParamsSliders />
+          </CollapsibleSection>
+          <CollapsibleSection title="Step 7 気候帯 調整" testId="section-climate-zone">
+            <ClimateZoneStepParamsSliders />
+          </CollapsibleSection>
         </section>
       </main>
     </div>

@@ -337,6 +337,76 @@ body {
   line-height: 1;
 }
 
+/* === Collapsible Section ([現状.md §6 U2]) === */
+
+.collapsible-section {
+  background: #14202c;
+  border: 1px solid #2a4055;
+  border-radius: 4px;
+  margin: 0;
+  min-width: 0;
+}
+
+.collapsible-section__summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #d8e6f4;
+  list-style: none; /* 既定の三角を消す */
+  user-select: none;
+  position: relative;
+  padding-right: 28px;
+}
+
+.collapsible-section__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* カスタム矢印（折りたたみ状態 ▶、展開状態 ▼） */
+.collapsible-section__summary::after {
+  content: '▶';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: #8aa0b8;
+  transition: transform 0.15s ease;
+}
+
+.collapsible-section[open] > .collapsible-section__summary::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+
+.collapsible-section__summary:hover {
+  background: #1a2c3d;
+}
+
+.collapsible-section__body {
+  padding: 0 14px 12px;
+}
+
+/* CollapsibleSection 内の .param-group は外側に枠と padding を持たない（重複回避） */
+.collapsible-section .param-group {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* CollapsibleSection 内の fieldset legend は summary と重複するので非表示 */
+.collapsible-section .param-group > legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* === Parameter / Legend panel (fieldset / legend pattern) === */
 
 .param-group {
