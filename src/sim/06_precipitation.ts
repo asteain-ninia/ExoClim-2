@@ -773,12 +773,14 @@ export function computePrecipitation(
           !inWindward &&
           !isITCZCoastalOnshore;
 
-        // [P4-57] Siberian high (NH 高緯度内陸 winter dry): lat 45-65°N の内陸
-        // （8 セル radius で海セルなし）陸地は冬月に dry、夏月に wet（対流性）。
-        // これがないと Df 一辺倒で Dw（亜寒帯冬季少雨）が全く出ない。実 Earth
-        // では中央シベリア / モンゴル / NE 中国がこの分布。
-        // Dw 条件「夏 wettest >= 10*冬 driest」を満たすため、夏月 'wet' (120mm) /
-        // 冬月 'dry' (10mm) で ratio 12 を確保する。
+        // [P4-57/58] Siberian high (NH 高緯度内陸 winter dry): lat 45-65°N の
+        // **東半分内陸** に冬月 dry / 夏月 wet。Pasta「東アジア (Mongolia/NE 中国/
+        // シベリア東部)」を再現。ユーザ FB「Dw 中央分布おかしい」(2026-05-04) で
+        // 東偏重が指示された。
+        // - 4 方向 ±6 セル先まで陸続き = 内陸判定（reach 8 → 6 に緩和）
+        // - 加えて east coast までの距離が west coast 距離より小さい = 東半分
+        // Dw 条件「夏 wettest >= 10*冬 driest」を満たすため夏 wet (120) /
+        // 冬 dry (10) で ratio 12 を確保。
         let isHighLatInterior = false;
         if (
           cell.isLand &&
@@ -788,7 +790,18 @@ export function computePrecipitation(
           !inWindward
         ) {
           let allLand = true;
-          for (const [di, dj] of [[0, 8], [0, -8], [8, 0], [-8, 0]] as ReadonlyArray<
+          let westCoastCells = 999;
+          let eastCoastCells = 999;
+          // 東西方向に最近海セルまでの距離をスキャン（最大 60°）
+          for (let dc = 1; dc < 60; dc++) {
+            const njW = ((j - dc) % cols + cols) % cols;
+            const njE = ((j + dc) % cols + cols) % cols;
+            if (westCoastCells === 999 && grid.cells[i]?.[njW]?.isLand === false) westCoastCells = dc;
+            if (eastCoastCells === 999 && grid.cells[i]?.[njE]?.isLand === false) eastCoastCells = dc;
+            if (westCoastCells !== 999 && eastCoastCells !== 999) break;
+          }
+          // 4 方向 ±6 セル radius 内陸判定
+          for (const [di, dj] of [[0, 6], [0, -6], [6, 0], [-6, 0]] as ReadonlyArray<
             readonly [number, number]
           >) {
             const ni = i + di;
@@ -803,7 +816,9 @@ export function computePrecipitation(
               break;
             }
           }
-          isHighLatInterior = allLand;
+          // 東半分判定（東岸まで西岸までより近い）
+          const isEasternHalf = eastCoastCells <= westCoastCells;
+          isHighLatInterior = allLand && isEasternHalf;
         }
         const isSiberianWinterDry =
           isHighLatInterior && isWinterMonthForLatitude(m, cell.latitudeDeg);
