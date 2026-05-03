@@ -1,4 +1,4 @@
-# Pasta 整合性ステータス（2026-05-04 P4-71 時点）
+# Pasta 整合性ステータス（2026-05-04 P4-83 時点）
 
 ユーザ FB「現状ってどこまで真似できていてどこが真似できていないんですか？」
 への回答。Worldbuilding Pasta（"An Apple Pie from Scratch" + "Worldbuilder's
@@ -39,7 +39,7 @@ Log"）と当アプリの Step 1-7 を機能単位で対応付けた表。
 | §4.2 亜熱帯ジャイヤ (NH/SH) | ✅ | 1 盆あたり 4 streamline (warm/cold/neutral) |
 | §4.3 暖寒流 per-cell 分類 | ✅ | `classifyOceanCell` west/east 距離比 |
 | §4.5 衝突点 (赤道流 / 極流) | ✅ | 1 盆 4 点、P4-47 で陸セル避けスナップ |
-| §4.5 中緯度衝突点 (lat ±30°) | 🔴 | CollisionPointType に未追加 |
+| §4.5 中緯度衝突点 (lat ±30°) | ✅ (P4-80) | `mid_latitude_branching` 型追加、basin 東縁にスナップ、シアンマーカー |
 | §4.6 極ジャイヤ (lat ≈80°) | ✅ | polar easterlies による西進反転を 3 streamline 追加 |
 | §4.7 寒流沿い東岸海氷延長 | ✅ | NH/SH 冬季のみ extension |
 | §4.8 海岸補正の影響保持距離 | 🟡 | 線形減衰 `coastalInfluenceRangeDeg` (既定 5°) |
@@ -108,7 +108,12 @@ Log"）と当アプリの Step 1-7 を機能単位で対応付けた表。
 | §4.1.7 寒冷地 B → D 振り戻し (WL#40) | ✅ (P4-19) | `aridReclassToDEnabled` |
 | §4.1.5 A 群拡張 (赤道帯救済 WL#40 風) | ✅ (P4-49) | `tropicalExtensionEnabled` |
 | §4.1.x BS リング (砂漠は必ずステップに囲まれる WL#37) | ✅ (P4-55) | `bsRingAroundBwEnabled` |
-| §4.1.8 季節調整 / §4.1.9 Climate clash | 🔴 | ITCZ 移動帯 savanna 拡張、不自然隣接検出 未実装 |
+| §4.1.8 ITCZ 移動帯 savanna 拡張 | ✅ (P4-81) | `applyItczMigrationSavannaExpansion` BWh/BSh@\|lat\|≤15° + winterMin≥18°C → Aw |
+| §4.1.8 中緯度西岸 desert 海岸延長 | ✅ (P4-81) | `applyWestCoastDesertExtension` lat 18-25° 西岸 A/C → BSh |
+| §4.1.4 Cs ベルト強制 (lat 30-42° 西岸) | ✅ (P4-82) | `applyMediterraneanWestCoastForce` C 群 + B 群 → Csa/Csb |
+| §4.1.4 Cfb wedge 強制 (lat 45-60° 西岸) | ✅ (P4-83) | `applyCfbWestCoastForce` D 群 → Cfb |
+| §4.1.5 赤道直上 Af 保護 | ✅ (P4-82) | `applyEquatorialAfProtection` \|lat\|<5° + winterMin≥18°C → Af |
+| §4.1.9 Climate clash 検出 | ✅ (P4-79) | `computeClimateClash` 群レベル差≥3 を mask 化、UI 診断 overlay |
 | §7.5 蒸発散量 厳密式 | 🟡 | Step 5 の暫定線形式に依存 |
 | §7.6 降水ラベル → mm/月 変換 | 🟡 | `precipitationMmByLabel` 経験値 (10/60/120/240) |
 | **D/C 境界 winterMin** | ⚠ | 標準 Köppen -3°C (P4-68 で採用)、Pasta WL#40 の 0°C 厳格版から外した |
@@ -136,14 +141,32 @@ Log"）と当アプリの Step 1-7 を機能単位で対応付けた表。
 
 ### 🔴 意図的未実装 / 大きな未着手項目
 
-- **agent-tracing 多段階パス**: 旧 ExoClim の crawl + collision-field 勾配追従の本格移植。現状は矩形 gyre + split のみで、陸沿い這行が直線的
+- **agent-tracing 多段階パス**: 旧 ExoClim の crawl + collision-field 勾配追従の本格移植。現状は矩形 gyre + split のみで、陸沿い這行が直線的（ECC のみ skeleton 完成）
 - **Step 3 月別 streamline 差**: 12 ヶ月で同一（季節依存は Step 5 feedback 後）
 - **Step 4 Lee cyclogenesis**: Pasta 詳細なし
 - **Step 6 季節低気圧 (Madeline James 手法)**: 前線ベース未採用
 - **Step 6 内海/湖 fetch 計算**: 外洋扱い
 - **Step 7 系統 2 (Bioclimate System)**: GDD/HDD/Ar/Evr 未計算
-- **Step 7 §4.1.8/4.1.9 季節調整 + Climate clash 検出**: 未実装
-- **中緯度衝突点 (lat ±30°)**: CollisionPointType 拡張要
+- ~~**Step 7 §4.1.8 季節調整**~~: ✅ P4-81 で savanna 拡張 + 西岸 desert 延長
+- ~~**Step 7 §4.1.9 Climate clash 検出**~~: ✅ P4-79 で実装
+- ~~**中緯度衝突点 (lat ±30°)**~~: ✅ P4-80 で `mid_latitude_branching` 追加
+
+### 🟢 P4-79..P4-83 で追加された後処理 (お手本準拠 forced classification)
+
+ユーザ FB「お手本準拠を磨く」と subagent 客観評価への対応。Pasta が緯度・
+海岸・ITCZ 移動帯ベースで暗黙に期待する気候帯配置を、計算層が取り逃すケースに
+対する post-processing 補正:
+
+- 赤道直上 Af 保護 (P4-82)
+- Cs ベルト強制 lat 30-42° 西岸 (P4-82)
+- Cfb wedge 強制 lat 45-60° 西岸 (P4-83)
+- ITCZ 移動帯 savanna 拡張 (P4-81)
+- 中緯度西岸 desert 海岸延長 (P4-81)
+- BS リング (P4-55)
+- A 群拡張 赤道帯救済 (P4-49)
+- B → D 振り戻し (P4-19)
+
+すべて `params.*Enabled` フラグで OFF 可能（Pasta 純粋計算結果を見るとき）。
 
 ### ⚠ 既知不一致 (Pasta と異なる選択を意図的に)
 
