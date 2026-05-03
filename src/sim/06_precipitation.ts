@@ -691,6 +691,43 @@ export function computePrecipitation(
           }
         }
 
+        // [P4-56] 拡張モンスーン: lat 15-40° 海岸セルで、その月の風が onshore
+        // （陸向き）+ 隣接海セルに warm correction (>0) があれば summer wet。
+        // ITCZ band 外でも亜熱帯モンスーン（China/SE US/India analog）を再現。
+        // 結果として東岸 25-35° の Cwa（温暖冬季少雨）が出るようになる。
+        let isMonsoonOnshore = false;
+        if (cell.isLand && absLat >= 15 && absLat <= 40 && !inITCZ) {
+          const normal = coastalNormalIntoLand(grid, i, j);
+          if (normal) {
+            const w = windField?.[i]?.[j];
+            if (w) {
+              const dot = w.uMps * normal.nx + w.vMps * normal.ny;
+              // onshore（正の dot）+ 隣接海セルに warm current がある場合
+              if (dot > 0) {
+                const monthCorr =
+                  oceanCurrentResult.monthlyCoastalTemperatureCorrectionCelsius[m];
+                let warmAdj = false;
+                // 4 + 拡張近傍を見る（east coast cell の east side ocean を捕捉）
+                for (const [di, dj] of [
+                  [0, 1], [0, -1], [1, 0], [-1, 0], [0, 2], [0, -2], [1, 1], [-1, 1],
+                ] as ReadonlyArray<readonly [number, number]>) {
+                  const ni = i + di;
+                  if (ni < 0 || ni >= rows) continue;
+                  const nj = ((j + dj) % cols + cols) % cols;
+                  const nCell = grid.cells[ni]?.[nj];
+                  if (!nCell || nCell.isLand) continue;
+                  // 暖流隣接判定: 0 より大なら採用（旧 > 0.5 は厳しすぎ）
+                  if ((monthCorr?.[ni]?.[nj] ?? 0) > 0) {
+                    warmAdj = true;
+                    break;
+                  }
+                }
+                if (warmAdj) isMonsoonOnshore = true;
+              }
+            }
+          }
+        }
+
         // 優先順序:
         //   ITCZ + wet候補 → very_wet
         //   wet候補 → wet
@@ -741,6 +778,9 @@ export function computePrecipitation(
         } else if (isWetCandidate) {
           labelRow[j] = 'wet';
         } else if (isITCZCoastalOnshore) {
+          labelRow[j] = 'wet';
+        } else if (isMonsoonOnshore) {
+          // [P4-56] 亜熱帯モンスーン onshore wet（subtropical high dry rule より優先）
           labelRow[j] = 'wet';
         } else if (inITCZ && absLat < 15) {
           // [P4-54] ITCZ 圏内の対流性降水: 深熱帯（lat<15°）に限定。
