@@ -440,8 +440,9 @@ function renderPng(mode: RenderMode, outPath: string, includeLegend = false): vo
   // メイン地図
   for (let y = 0; y < CANVAS_HEIGHT_PX; y++) {
     const latDeg = 90 - (y / CANVAS_HEIGHT_PX) * 180;
-    const r = Math.min(rows - 1, Math.max(0, Math.floor(((90 + latDeg) / 180) * rows)));
-    const gridR = rows - 1 - r;
+    // grid r=0 が南極（latDeg=-89.5）、r=rows-1 が北極（latDeg=+89.5）
+    // よって y=0（top, latDeg=+90）→ gridR=rows-1
+    const gridR = Math.min(rows - 1, Math.max(0, Math.floor(((latDeg + 90) / 180) * rows)));
     for (let x = 0; x < CANVAS_WIDTH_PX; x++) {
       const lonDeg = -180 + (x / CANVAS_WIDTH_PX) * 360;
       const c = Math.min(cols - 1, Math.max(0, Math.floor(((180 + lonDeg) / 360) * cols)));

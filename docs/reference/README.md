@@ -1,5 +1,40 @@
 # 気候帯「お手本画像」(P4-44 サイクル, 2026-05-03)
 
+## v2 (geographico ブログ準拠) — 推奨
+
+`generate_geographico_climate.mts` で生成。**こちらを優先して見てください。**
+ユーザフィードバック「procedural earth-stat 地形だと正しさを判定しづらい。
+仮想大陸（Geographico! ブログ）の手順に揃えてほしい」を反映した第 2 版。
+
+**ファイル**:
+| ファイル | 内容 |
+|---|---|
+| `geographico_terrain.png` | 1260×630。仮想大陸（idealized_continent プリセット = 経度中央寄せ・緯度別 Earth-stat 陸地割合）地形のみ |
+| `geographico_climate.png` | 1260×740。地形 + Köppen overlay + 凡例 |
+| `geographico_climate_only.png` | 1260×740。純色 Köppen + 凡例 |
+
+**地形の形**: 「ダイヤ/凧型」の単一連続大陸 + 南極小大陸。
+- NH 90°-50°: 幅広（Greenland + Eurasia 北部に対応）
+- NH 50°-赤道: なだらかに細る
+- 0°〜30°S: 急速に細まる
+- 30°S〜60°S: 細い「首」
+- 60°S〜90°S: 再度広がる（南極大陸）
+
+**気候帯ルール（出典 entry 番号付き、blog 5 ステップ手順をなぞる）**:
+- §A 熱帯 (entry 373): 赤道直下に Af、東岸寄りに広く・西岸 Am、10-15°で Aw
+- §B 乾燥 (entry 374): 20° 前後の中央部 BW、西岸 BW（cold current）、周辺 BS、Aw / Cwa は冬季少雨側
+- §C 地中海性 (entry 375): 西岸 30-40° に Cs（夏乾燥）
+- §D 温帯湿潤 (entry 376): 東岸 30-45° に Cfa、西岸 40-55° に Cfb（暖流＋偏西風）
+- §E 亜寒帯/寒帯 (entry 377): NH 50-70° 両サイド Df / 中央 Dw、SH には D 群を出さない、極帯は ET → EF
+
+**参照 blog エントリ**: <http://geographico.blog.fc2.com/blog-category-18.html>
+（entry 371〜377、ライネ氏「Geographico!」より）。
+画像参照は `docs/reference/geographico_imgs/` に保存（13 枚）。
+
+---
+
+## v1 (procedural Earth 地形 + 自前推論) — 旧版
+
 ユーザ依頼により作成。`src/sim/07_climate_zone.ts` の現状出力が
 - 対称性が崩れない（同緯度の東西で気候が変わらない）
 - 赤道直下〜南北 25° の陸地が C 群に支配される
