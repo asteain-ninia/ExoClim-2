@@ -538,6 +538,22 @@ body {
   align-items: start;
 }
 
+/* [P4-67] U4 上位グループタイトル: 全 grid 列幅にまたがる見出し */
+.controls-section__group-title {
+  grid-column: 1 / -1;
+  margin: 16px 0 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 4px;
+}
+
+.controls-section__group-title:first-child {
+  margin-top: 0;
+}
+
 @media (max-width: 1100px) {
   .controls-section {
     grid-template-columns: repeat(2, minmax(0, 1fr));

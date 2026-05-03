@@ -148,6 +148,10 @@ export function App() {
           <SeasonSelector />
         </section>
         <section className="controls-section">
+          {/* グループ 1: マップ表示 ([P4-67] U4) */}
+          <h3 className="controls-section__group-title" data-testid="group-display">
+            マップ表示
+          </h3>
           <CollapsibleSection title="表示トグル" testId="section-legend" initiallyOpen>
             <Legend />
           </CollapsibleSection>
@@ -165,6 +169,10 @@ export function App() {
           >
             <CellInspector />
           </CollapsibleSection>
+          {/* グループ 2: 入力パラメータ（惑星と地形） */}
+          <h3 className="controls-section__group-title" data-testid="group-input">
+            入力パラメータ
+          </h3>
           <CollapsibleSection title="地形" testId="section-terrain" initiallyOpen>
             <TerrainSourceSelector />
           </CollapsibleSection>
@@ -189,6 +197,10 @@ export function App() {
           >
             <AtmosphereOceanSliders />
           </CollapsibleSection>
+          {/* グループ 3: シミュレーション調整 (Step 1-7) */}
+          <h3 className="controls-section__group-title" data-testid="group-sim">
+            シミュレーション調整
+          </h3>
           <CollapsibleSection
             title="Step 1 ITCZ 調整"
             testId="section-itcz"
