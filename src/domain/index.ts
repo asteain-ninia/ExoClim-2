@@ -4,6 +4,17 @@
 export type { Cell, Grid, GridResolutionDeg } from './grid';
 export { DEFAULT_GRID_RESOLUTION_DEG, createGrid } from './grid';
 
+export {
+  EARTH_RADIUS_KM,
+  KM_PER_DEG_LAT,
+  cellsToKm,
+  degLatToKm,
+  degLonToKm,
+  kmToChebCells,
+  kmToLatCells,
+  kmToLonCells,
+} from './distance';
+
 export type { EarthLatitudeStat, ElevationBinMeters } from './earthStatistics';
 export {
   EARTH_GLOBAL_LAND_FRACTION,

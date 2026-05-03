@@ -98,15 +98,15 @@ export function TemperatureStepParamsSliders() {
       <Slider
         id="temperature-coastal-inland-reach"
         label="海流補正の内陸到達距離"
-        unit="セル"
+        unit="km"
         min={0}
-        max={15}
-        step={1}
+        max={3000}
+        step={100}
         precision={0}
-        value={temperatureParams.coastalCorrectionInlandReachCells}
-        defaultValue={DEFAULT_TEMPERATURE_STEP_PARAMS.coastalCorrectionInlandReachCells}
-        helpText="暖流/寒流の温度補正が陸内何セルまで届くか（既定 5）。0 で旧挙動（陸セル補正 0）。Pasta WL#28 由来、東岸湿潤亜熱帯/西岸乾燥の主因。"
-        onChange={(v) => setTemperatureParams({ coastalCorrectionInlandReachCells: v })}
+        value={temperatureParams.coastalCorrectionInlandReachKm}
+        defaultValue={DEFAULT_TEMPERATURE_STEP_PARAMS.coastalCorrectionInlandReachKm}
+        helpText="暖流/寒流の温度補正が陸内何 km まで届くか（既定 1100 km）。0 で旧挙動（陸セル補正 0）。Pasta WL#28「2000 km from coast」相当。"
+        onChange={(v) => setTemperatureParams({ coastalCorrectionInlandReachKm: v })}
       />
     </fieldset>
   );

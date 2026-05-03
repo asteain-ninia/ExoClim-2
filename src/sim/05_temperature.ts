@@ -34,6 +34,7 @@ import type {
   WindBeltResult,
   WindVector,
 } from '@/domain';
+import { KM_PER_DEG_LAT, cellsToKm } from '@/domain';
 
 import { solarDeclinationDeg } from './01_itcz';
 
@@ -140,15 +141,16 @@ export interface TemperatureStepParams {
    */
   readonly isothermIntervalCelsius: number;
   /**
-   * 海岸補正の内陸到達距離（セル単位、[現状.md ユーザ指摘 2026-05-03、P4-50]）。
+   * 海岸補正の内陸到達距離（km、[現状.md ユーザ FB 2026-05-04、P4-73]）。
    *
-   * 旧来は陸セルの coastal correction が常に 0 となり、同緯度東西で気温が
-   * 一致する症状（→ Step 7 で同色気候帯）が発生していた。本値を増やすと
-   * 隣接海セルの correction が線形減衰で陸地内まで伝播する（reach=0 で旧挙動）。
+   * Pasta WL#28「2000 km from coast」を念頭に km 単位で記述。grid 解像度や
+   * 緯度に依らず一定の物理距離を保つ。propagation 関数で各セルの緯度に
+   * 応じて km → cells へ変換（経度方向は cos 補正、緯度方向は等距）。
    *
-   * 既定 5 セル（解像度 1° で約 5°/550km、Pasta WL#28 の「数百 km 内陸まで」記述に整合）。
+   * 既定 1100 km。Pacific NW / 北欧の Cfb 帯の最大幅にほぼ整合。
+   * 0 で旧挙動（陸セル correction = 0）。
    */
-  readonly coastalCorrectionInlandReachCells: number;
+  readonly coastalCorrectionInlandReachKm: number;
 }
 
 export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
@@ -158,10 +160,8 @@ export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   snowIceFeedbackIterations: 2,
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
-  // [P4-57/68] 7 → 10 に増加。Pasta WL#28「数百 km 内陸まで」+ お手本（清書版）の
-  // 西岸 Cfb wedge を実現するため。10° ≈ 1100 km は西岸海洋性気候の最大幅
-  // （Pacific NW / 北欧の Cfb 帯）にほぼ整合。
-  coastalCorrectionInlandReachCells: 10,
+  // [P4-73] cells → km へ移行。1100 km ≈ Pacific NW / 北欧 Cfb 帯の最大幅。
+  coastalCorrectionInlandReachKm: 1100,
 };
 
 /**
@@ -380,56 +380,69 @@ function computeDistanceToOcean(grid: Grid): number[][] {
 }
 
 /**
- * 海セルの coastal correction を陸セルへ伝播させる（[現状.md ユーザ指摘 2026-05-03、P4-50]）。
+ * 海セルの coastal correction を陸セルへ伝播させる（[P4-50, P4-73]）。
  *
  * 旧来は陸セルの correction = 0 → 同緯度の land 温度が一致 → 気候帯が東西対称になる
  * 症状の主因の 1 つ。Pasta `Worldbuilder's Log #28` で「暖流/寒流は数百 km 内陸の
  * 気温に効く」と説明される現象を、最寄り海セルからの線形減衰で近似する。
  *
+ * [P4-73] 引数を **km ベース**に変更。各陸セルでその緯度に応じた reach (cells) を
+ * 算出することで、grid 解像度や緯度に依らず一定の物理距離を保つ。
+ *
  * アルゴリズム: 各陸セルから (2*reach+1)^2 の窓を Chebyshev 距離で走査し、
  * 窓内の海セルの correction × decay の中で **絶対値最大** の符号付き値を採用する。
- * 経度はラップ、緯度はクランプ。
+ * 経度はラップ、緯度はクランプ。距離も km 換算（lat 方向 = 一定、lon 方向 = cos 補正）。
  *
- * 海セルは元の correction を保持。reach=0 なら何もしない。
+ * 海セルは元の correction を保持。reachKm=0 なら何もしない。
  */
 function propagateCoastalCorrectionInland(
   grid: Grid,
   oceanCorrection: ReadonlyArray<ReadonlyArray<number>>,
-  reachCells: number,
+  reachKm: number,
 ): number[][] {
   const rows = grid.latitudeCount;
   const cols = grid.longitudeCount;
+  const resolutionDeg = grid.resolutionDeg;
   const out: number[][] = new Array(rows);
   for (let i = 0; i < rows; i++) {
     const sourceRow = oceanCorrection[i];
     out[i] = sourceRow ? Array.from(sourceRow) : new Array<number>(cols).fill(0);
   }
-  if (reachCells <= 0) return out;
+  if (reachKm <= 0) return out;
+  // 緯度方向 reach は緯度依存なし: km / (resolutionDeg × 111.32)
+  const reachLatCells = Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT));
   for (let i = 0; i < rows; i++) {
     const cellRow = grid.cells[i];
     if (!cellRow) continue;
+    // 当該緯度行の lon 方向 reach (cos 補正)
+    const latDeg = cellRow[0]?.latitudeDeg ?? 0;
+    const cosLat = Math.max(0.05, Math.cos(latDeg * Math.PI / 180));
+    const reachLonCells = Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT * cosLat));
+    // 探索窓を緯度別に変えるが、性能上限を 60 セルでクランプ（極帯で発散防止）
+    const reachLatCellsClamped = Math.min(reachLatCells, 60);
+    const reachLonCellsClamped = Math.min(reachLonCells, 60);
     for (let j = 0; j < cols; j++) {
       const cell = cellRow[j];
-      if (!cell || !cell.isLand) continue; // 海はそのまま
-      // (2*reach+1)^2 窓走査
+      if (!cell || !cell.isLand) continue;
       let bestAbs = 0;
       let bestSigned = 0;
-      for (let di = -reachCells; di <= reachCells; di++) {
+      for (let di = -reachLatCellsClamped; di <= reachLatCellsClamped; di++) {
         const ni = i + di;
         if (ni < 0 || ni >= rows) continue;
         const nRow = grid.cells[ni];
         if (!nRow) continue;
         const corrRow = oceanCorrection[ni];
         if (!corrRow) continue;
-        for (let dj = -reachCells; dj <= reachCells; dj++) {
+        for (let dj = -reachLonCellsClamped; dj <= reachLonCellsClamped; dj++) {
           const nj = ((j + dj) % cols + cols) % cols;
           const nCell = nRow[nj];
-          if (!nCell || nCell.isLand) continue; // 陸は source 不可
+          if (!nCell || nCell.isLand) continue;
           const sourceCorr = corrRow[nj] ?? 0;
           if (sourceCorr === 0) continue;
-          const cheb = Math.max(Math.abs(di), Math.abs(dj));
-          if (cheb > reachCells) continue;
-          const decay = Math.max(0, 1 - cheb / (reachCells + 1));
+          // km 距離での減衰計算（より物理的）
+          const km = cellsToKm(di, dj, resolutionDeg, latDeg);
+          if (km > reachKm) continue;
+          const decay = Math.max(0, 1 - km / reachKm);
           const weighted = sourceCorr * decay;
           const absVal = Math.abs(weighted);
           if (absVal > bestAbs) {
@@ -461,7 +474,7 @@ function buildInitialMonthlyTemperatureCelsius(
   oceanCurrent: OceanCurrentResult,
   distToOcean: number[][],
   continentalityStrength: number,
-  coastalCorrectionInlandReachCells: number,
+  coastalCorrectionInlandReachKm: number,
 ): number[][][] {
   const rows = grid.latitudeCount;
   const cols = grid.longitudeCount;
@@ -478,7 +491,7 @@ function buildInitialMonthlyTemperatureCelsius(
       ? propagateCoastalCorrectionInland(
           grid,
           coastalCorrection,
-          coastalCorrectionInlandReachCells,
+          coastalCorrectionInlandReachKm,
         )
       : null;
     for (let i = 0; i < rows; i++) {
@@ -885,7 +898,7 @@ export function computeTemperature(
     oceanCurrentResult,
     distToOcean,
     params.continentalityStrength,
-    params.coastalCorrectionInlandReachCells,
+    params.coastalCorrectionInlandReachKm,
   );
 
   // 6. 風移流補正（月別）

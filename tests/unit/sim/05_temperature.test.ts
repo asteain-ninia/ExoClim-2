@@ -441,9 +441,11 @@ describe('sim/05_temperature: 内部ヘルパ', () => {
     expect(dist[i]?.[jInterior] ?? 0).toBeGreaterThan(0);
   });
 
-  it('propagateCoastalCorrectionInland [P4-50]: 海セルの正補正が陸セルに線形減衰で広がる', () => {
-    // 細い陸地ストリップを作り、隣接する海セルの 1 つに warm correction +10 を置く。
-    // index 算術で land と sea の境界を直接特定する（baseGrid 解像度 2°）。
+  it('propagateCoastalCorrectionInland [P4-50/P4-73]: 海セルの正補正が陸セルに線形減衰で広がる（km ベース）', () => {
+    // baseGrid 2° で東端 land（lat 0°）に隣接する海セルに warm correction +10。
+    // 解像度 2° + 赤道なので 1 セル = 222.64 km。reach 1113 km (= 5 セル相当) で:
+    //   - 距離 1 セル (222.64 km): decay = 1 - 222.64/1113 = 0.8 → 8.0
+    //   - 距離 11 セル (2449 km): reach 外 → 0
     const grid = mapGridCells(baseGrid(), (cell) =>
       cell.longitudeDeg >= 0 && cell.longitudeDeg <= 30 && Math.abs(cell.latitudeDeg) <= 10
         ? { ...cell, isLand: true, continentId: 'strip' }
@@ -452,7 +454,6 @@ describe('sim/05_temperature: 内部ヘルパ', () => {
     const rows = grid.latitudeCount;
     const cols = grid.longitudeCount;
     const iEq = Math.floor(rows / 2);
-    // 当該行の land/sea を実物で探索
     let landEastEdge = -1;
     for (let j = cols - 1; j >= 0; j--) {
       if (grid.cells[iEq]![j]!.isLand) {
@@ -461,27 +462,28 @@ describe('sim/05_temperature: 内部ヘルパ', () => {
       }
     }
     expect(landEastEdge).toBeGreaterThan(0);
-    const jSeaAdj = landEastEdge + 1; // 東隣の海
+    const jSeaAdj = landEastEdge + 1;
 
     const corr: number[][] = new Array(rows);
     for (let i = 0; i < rows; i++) corr[i] = new Array<number>(cols).fill(0);
     corr[iEq]![jSeaAdj] = 10;
 
-    const out = __internals.propagateCoastalCorrectionInland(grid, corr, 5);
+    // reach 1113 km ≈ 旧 5 セル相当（赤道、解像度 2°）
+    const out = __internals.propagateCoastalCorrectionInland(grid, corr, 1113);
 
     // 海セルは元の値を維持
     expect(out[iEq]![jSeaAdj]).toBe(10);
 
-    // 陸セル東端（landEastEdge）→ Chebyshev=1 → decay = 1 - 1/(5+1) ≈ 0.833
-    expect(out[iEq]![landEastEdge]).toBeCloseTo(10 * (1 - 1 / 6), 4);
+    // 陸セル東端: Chebyshev=1 セル = 222.64 km → decay ≈ 0.8 → 8.0
+    expect(out[iEq]![landEastEdge]).toBeCloseTo(8.0, 1);
 
-    // 陸セル深い内陸 (landEastEdge - 10) → Chebyshev=11 > 5 → 0 のまま
+    // 陸セル深い内陸 (landEastEdge - 10) → 2226 km > 1113 km → 0
     const jDeep = landEastEdge - 10;
     if (jDeep >= 0 && grid.cells[iEq]![jDeep]!.isLand) {
       expect(out[iEq]![jDeep]).toBe(0);
     }
 
-    // reach=0 なら propagation 無し（陸セル 0）
+    // reach 0 km なら propagation 無し
     const out0 = __internals.propagateCoastalCorrectionInland(grid, corr, 0);
     expect(out0[iEq]![landEastEdge]).toBe(0);
   });
