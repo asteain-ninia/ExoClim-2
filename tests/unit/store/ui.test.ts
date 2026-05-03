@@ -54,17 +54,31 @@ describe('store/ui: UI 状態 store', () => {
   });
 
   describe('reset', () => {
-    it('reset で初期状態に戻る（hoveredCell を含む）', () => {
+    it('reset で初期状態に戻る（hoveredCell / isComputing を含む）', () => {
       store.getState().setCurrentStep('precipitation');
       store.getState().setCurrentSeason(3);
       store.getState().setLegendVisibility({ itczCenterLine: false });
       store.getState().setHoveredCell({ latIndex: 10, lonIndex: 20 });
+      store.getState().setIsComputing(true);
       store.getState().reset();
       const s = store.getState();
       expect(s.currentStep).toBe('itcz');
       expect(s.currentSeason).toBe('annual');
       expect(s.legendVisibility.itczCenterLine).toBe(true);
       expect(s.hoveredCell).toBeNull();
+      expect(s.isComputing).toBe(false);
+    });
+  });
+
+  describe('setIsComputing ([P4-34])', () => {
+    it('初期値は false', () => {
+      expect(store.getState().isComputing).toBe(false);
+    });
+    it('true / false を切替えできる', () => {
+      store.getState().setIsComputing(true);
+      expect(store.getState().isComputing).toBe(true);
+      store.getState().setIsComputing(false);
+      expect(store.getState().isComputing).toBe(false);
     });
   });
 });

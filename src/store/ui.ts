@@ -75,6 +75,12 @@ export interface UIState {
   readonly legendVisibility: LegendVisibility;
   /** マウスオーバー中のセル。マップ外なら null。 */
   readonly hoveredCell: HoveredCell | null;
+  /**
+   * pipeline 計算中フラグ（[現状.md §6 U12]、P4-34 追加）。
+   * connection 層が pipeline 起動/完了に応じて true/false に更新する。
+   * UI 側は LoadingIndicator コンポーネントで購読してスピナー表示の判定に使う。
+   */
+  readonly isComputing: boolean;
 }
 
 export interface UIActions {
@@ -84,6 +90,8 @@ export interface UIActions {
   readonly setLegendVisibility: (patch: Partial<LegendVisibility>) => void;
   /** マウスオーバー中のセルを設定（マップ外で null）。 */
   readonly setHoveredCell: (cell: HoveredCell | null) => void;
+  /** pipeline 計算中フラグを更新する（[P4-34]）。 */
+  readonly setIsComputing: (computing: boolean) => void;
   readonly reset: () => void;
 }
 
@@ -111,6 +119,7 @@ const INITIAL_UI_STATE: UIState = {
     climateZones: false,        // 気候帯 overlay（既定 OFF、地形が見えなくなるため）
   },
   hoveredCell: null,
+  isComputing: false,
 };
 
 export const createUIStore = () =>
@@ -123,6 +132,7 @@ export const createUIStore = () =>
         legendVisibility: { ...state.legendVisibility, ...patch },
       })),
     setHoveredCell: (cell) => set({ hoveredCell: cell }),
+    setIsComputing: (isComputing) => set({ isComputing }),
     reset: () => set(INITIAL_UI_STATE),
   }));
 

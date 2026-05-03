@@ -8,6 +8,7 @@ import {
   useNotificationsStore,
   useParamsStore,
   useResultsStore,
+  useUIStore,
 } from '@/store';
 import {
   AirflowStepParamsSliders,
@@ -18,6 +19,7 @@ import {
   Footer,
   ITCZStepParamsSliders,
   Legend,
+  LoadingIndicator,
   MapCanvas,
   OceanCurrentStepParamsSliders,
   OrbitalSliders,
@@ -37,6 +39,7 @@ export function App() {
     const bridge = createWorkerPipelineBridge();
     const { dispose } = connectStoresToBridge(useParamsStore, useResultsStore, bridge, {
       notificationsStore: useNotificationsStore,
+      uiStore: useUIStore,
     });
     return () => {
       dispose();
@@ -55,7 +58,10 @@ export function App() {
               (ITCZ → 風帯 → 海流 → 気流 → 気温 → 降水 → 気候帯) 連結済
             </p>
           </div>
-          <ResetButton />
+          <div className="app__header-actions">
+            <LoadingIndicator />
+            <ResetButton />
+          </div>
         </div>
       </header>
       <main className="app__main">

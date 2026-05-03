@@ -18,6 +18,7 @@ import type { PipelineInputs } from '@/worker/pipeline';
 import type { NotificationsStore } from './notifications';
 import type { ParamsStore } from './params';
 import type { ResultsStore } from './results';
+import type { UIStore } from './ui';
 
 export interface ConnectStoresOptions {
   /**
@@ -36,6 +37,11 @@ export interface ConnectStoresOptions {
    * 指定なしならエラーは console.error のみ。
    */
   readonly notificationsStore?: StoreApi<NotificationsStore>;
+  /**
+   * UI store。pipeline 計算中フラグを更新するために使う（[現状.md §6 U12]、P4-34）。
+   * 指定なしなら isComputing 更新は省略（UI 側で表示しない）。
+   */
+  readonly uiStore?: StoreApi<UIStore>;
 }
 
 /**
@@ -84,6 +90,7 @@ export function connectStoresToBridge(
       return;
     }
     isRunning = true;
+    options.uiStore?.getState().setIsComputing(true);
     try {
       do {
         pendingDirty = false;
@@ -106,6 +113,7 @@ export function connectStoresToBridge(
       } while (pendingDirty);
     } finally {
       isRunning = false;
+      options.uiStore?.getState().setIsComputing(false);
     }
   };
 

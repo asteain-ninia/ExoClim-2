@@ -3,6 +3,7 @@
 
 export { CollapsibleSection } from './CollapsibleSection';
 export { Footer } from './Footer';
+export { LoadingIndicator } from './LoadingIndicator';
 export { ResetButton } from './ResetButton';
 export { Toast } from './Toast';
 
