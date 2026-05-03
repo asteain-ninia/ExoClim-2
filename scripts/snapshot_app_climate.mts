@@ -125,8 +125,32 @@ for (const [z, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
   console.log(`  ${z.padEnd(4)}: ${n}`);
 }
 
-// レンダリング
+// レンダリング: アプリ風に「地形シェード + Köppen overlay (alpha=200)」
 const png = new PNG({ width: CANVAS_WIDTH_PX, height: CANVAS_HEIGHT_PX + LEGEND_H });
+const CLIMATE_ALPHA = 200;
+function elevShade(elevM: number, isLand: boolean): [number, number, number] {
+  if (!isLand) {
+    const d = Math.min(1, -elevM / 6000);
+    return [
+      Math.round(20 + (1 - d) * 60),
+      Math.round(70 + (1 - d) * 80),
+      Math.round(140 + (1 - d) * 80),
+    ];
+  }
+  return [180, 175, 150];
+}
+function blend(
+  a: [number, number, number],
+  b: [number, number, number],
+  alpha: number,
+): [number, number, number] {
+  const t = alpha / 255;
+  return [
+    Math.round(a[0] * (1 - t) + b[0] * t),
+    Math.round(a[1] * (1 - t) + b[1] * t),
+    Math.round(a[2] * (1 - t) + b[2] * t),
+  ];
+}
 for (let y = 0; y < CANVAS_HEIGHT_PX; y++) {
   const latDeg = 90 - (y / CANVAS_HEIGHT_PX) * 180;
   const gridR = Math.min(rows - 1, Math.max(0, Math.floor(((latDeg + 90) / 180) * rows)));
@@ -134,12 +158,10 @@ for (let y = 0; y < CANVAS_HEIGHT_PX; y++) {
     const lonDeg = -180 + (x / CANVAS_WIDTH_PX) * 360;
     const c = Math.min(cols - 1, Math.max(0, Math.floor(((180 + lonDeg) / 360) * cols)));
     const cell = grid.cells[gridR]![c]!;
-    let rgb: [number, number, number];
-    if (!cell.isLand) {
-      rgb = [180, 200, 220];
-    } else {
+    let rgb: [number, number, number] = elevShade(cell.elevationMeters, cell.isLand);
+    if (cell.isLand) {
       const z = climate.zoneCodes[gridR]?.[c];
-      rgb = z && KOPPEN[z] ? KOPPEN[z]! : [120, 120, 120];
+      if (z && KOPPEN[z]) rgb = blend(rgb, KOPPEN[z]!, CLIMATE_ALPHA);
     }
     const idx = (CANVAS_WIDTH_PX * y + x) * 4;
     png.data[idx] = rgb[0];
