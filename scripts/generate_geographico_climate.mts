@@ -169,13 +169,24 @@ for (let r = 0; r < rows; r++) {
   continentWidthDeg[r] = count * (360 / cols);
 }
 
-// ----- 気候帯割当（geographico ブログ手順を忠実に） ---------------------
+// ----- 気候帯割当（geographico ブログ + 実地球分布の修正、P4-51 改訂版） -
 
 /**
- * 地理メモ:
- *   - westFracInBand = 0 (西端) 〜 1 (東端) で、その緯度行内のどこにいるか
- *   - 西岸近接判定は westCoastDistDeg を、東岸近接は eastCoastDistDeg を使う
- *   - 中央部判定は |westFrac - 0.5| < 0.18 を「中央」とする
+ * 設計方針 (ユーザ FB 2026-05-04 反映、P4-51):
+ *
+ * **westFrac (0=西端 〜 1=東端) を主軸**にして、「色塗りが横方向に同一帯」になる
+ * 失敗を回避する。各緯度帯で westFrac による gradient を持たせ、本物の
+ * 地球（北米/ユーラシア + アフリカ）の分布を再現する。
+ *
+ * 主要原則:
+ *  - 大陸西岸 25-35°: 暖流・東岸 = 湿潤、寒流・西岸 = 砂漠
+ *  - **BW は西岸〜中央 (westFrac < 0.65)** に広く貫入する（Sahara analog 30°N の
+ *    西アフリカ〜中東 / 北米南西部）
+ *  - **BS は BW の周囲 ring**（north / south / east 三方向）→ 第 2 pass で実現
+ *  - 5-15°帯: 東岸寄り Aw / 中央 Aw / 西岸 Aw（"Am でない"）。Af の東側伸展を
+ *    確保するため、赤道帯は westFrac > 0.30 でも Af
+ *  - **Cfb wedge**: 内陸に行くほど北端が南下する（lat threshold が westFrac 関数）
+ *  - **Dw は中央でなく東寄り**（東アジア analog）。Df が東岸寄りに復活
  */
 function assignKoppen(r: number, c: number): string | null {
   if (!isLand(r, c)) return null;
@@ -184,156 +195,199 @@ function assignKoppen(r: number, c: number): string | null {
   const ci = coastInfo[r]![c]!;
   const widthDeg = continentWidthDeg[r]!;
 
-  // 大陸幅が小さい行（< 5°）は「点状大陸」として全部海岸扱い → 緯度のみで判定
+  // 大陸幅が小さい行は「点状大陸」として全部海岸扱い
   const westFrac = widthDeg > 0 ? ci.westCoastDistDeg / widthDeg : 0;
-  // const eastFrac = widthDeg > 0 ? ci.eastCoastDistDeg / widthDeg : 0;
-  const isWestSide = westFrac < 0.35; // 西半分
-  const isEastSide = westFrac > 0.65; // 東半分
-  const isCenter = westFrac >= 0.35 && westFrac <= 0.65;
-
-  // 海岸近接（経度的距離）
-  const veryWestCoast = ci.westCoastDistDeg <= 4;
-  const veryEastCoast = ci.eastCoastDistDeg <= 4;
+  const veryWestCoast = ci.westCoastDistDeg <= 3;
+  const veryEastCoast = ci.eastCoastDistDeg <= 3;
 
   // ===== §E 寒帯（lat 75°+） =====
   if (absLat >= 80) return 'EF';
   if (absLat >= 75) {
-    // 75-80°: ET 主体、内陸 or 80°近くは EF
     if (ci.nearestCoastDistDeg > 6) return 'EF';
     return 'ET';
   }
-  // 70-75°: ET / 内陸 EF にせず Dfd まで含む（NH のみ。SH は下の SH ブロックで処理）
   if (absLat >= 70 && latDeg > 0) {
     if (ci.nearestCoastDistDeg > 4) return 'Dfd';
     return 'ET';
   }
-  if (absLat >= 70 && latDeg < 0) {
-    return 'ET';
-  }
+  if (absLat >= 70 && latDeg < 0) return 'ET';
 
-  // ===== §E 亜寒帯（NH 50-70°、SH には適用しない） =====
+  // ===== NH 50-70° 亜寒帯（Df 海岸寄り、Dw 東中央寄り） =====
   if (latDeg >= 50 && latDeg < 70) {
-    // 海岸寄り (4° 以内): Df 系（湿潤）
-    // 内陸（中央部）: Dw 系（冬季少雨）
-    if (veryWestCoast || veryEastCoast) {
-      // 緯度で a/b/c/d を分ける: 50-55=Dfb, 55-60=Dfc, 60-65=Dfc, 65-70=Dfd
-      if (latDeg >= 65) return 'Dfd';
-      if (latDeg >= 55) return 'Dfc';
-      return 'Dfb';
+    // 西岸 Cfb wedge（後述の 35-50° 帯と接続させるため、ここでも極一部のみ）
+    if (veryWestCoast && latDeg < 55) return 'Cfb';
+    // 第 3 文字（緯度ベース）
+    const letter = latDeg >= 65 ? 'd' : latDeg >= 55 ? 'c' : 'b';
+    // 海岸寄り（westFrac < 0.15 or eastFrac < 0.15）: Df 湿潤
+    if (westFrac < 0.15 || westFrac > 0.85) return `Df${letter}` as string;
+    // **Dw は東寄り (westFrac 0.55-0.85) に集中** = Mongolia/NE Siberia analog
+    if (westFrac >= 0.55 && westFrac <= 0.85) {
+      return `Dw${letter}` as string;
     }
-    // 中央部
-    if (isCenter) {
-      if (latDeg >= 60) return 'Dwc';
-      if (latDeg >= 55) return 'Dwb';
-      return 'Dwb';
-    }
-    // 中間（5-10°）
-    if (latDeg >= 60) return 'Dfc';
-    if (latDeg >= 55) return 'Dfc';
-    return 'Dfb';
+    // それ以外（西〜中央 westFrac 0.15-0.55）: Df 主体
+    return `Df${letter}` as string;
   }
 
-  // ===== SH 50-70° は D 群を出さない（geographico の方針）→ ET / EF =====
-  if (latDeg <= -50 && latDeg > -70) {
-    // 大陸が殆ど存在しないが、もし出る場合は ET 扱い
-    if (ci.nearestCoastDistDeg > 6) return 'ET';
-    return 'ET';
-  }
+  // SH 50-70° は大陸ほぼ無し → ET
+  if (latDeg <= -50 && latDeg > -70) return 'ET';
 
   // ===== §C/D 温帯〜亜寒帯境界（35-50°） =====
   if (absLat >= 35 && absLat < 50) {
-    // 西岸 (4° 以内, 40-50°): Cfb 西岸海洋性
-    if (veryWestCoast && absLat >= 40) return 'Cfb';
-    // 西岸 (4° 以内, 35-40°): Csb 地中海性 cool
-    if (veryWestCoast) return absLat >= 38 ? 'Csb' : 'Csa';
-    // 東岸 (4° 以内): Cfa 湿潤亜熱帯（NH 45°以上は Dfa にエスカレート）
-    if (veryEastCoast) {
-      if (latDeg >= 45) return 'Dfa';
-      return 'Cfa';
-    }
-    // 中央部内陸: NH なら Dwa/Dwb、SH なら大陸自体ほぼないが Cfb で埋める
-    if (isCenter) {
-      if (latDeg > 0 && absLat >= 45) return 'Dwb';
-      if (latDeg > 0) return 'Dwa';
+    // **Cfb wedge**: 西岸では北 60°まで Cfb、内陸に行くほど北端が南下
+    //   wedge 北端 lat = 60 - 60*westFrac → westFrac=0 で 60°、=0.15 で 51°、=0.30 で 42°、=0.40 で 36°
+    //   westFrac >= 0.40 で wedge 終了（35°N 以下になる）
+    //   南端は 38°（Csb 境界より上）
+    const cfbNorthLimit = 60 - 60 * westFrac;
+    if (latDeg > 0 && westFrac < 0.40 && absLat <= cfbNorthLimit && absLat >= 38) {
       return 'Cfb';
     }
-    // 中間距離（西寄り）: 西岸海洋性の延長
-    if (isWestSide) return absLat >= 40 ? 'Cfb' : 'Csb';
-    // 中間距離（東寄り）: NH なら Dfa（湿潤大陸性）/ Cfa（35-45°）、SH なら Cfa
-    if (isEastSide) {
+    // 西岸近接 30-38°: Csb / Csa（地中海性）
+    if (veryWestCoast || westFrac < 0.05) {
+      if (absLat >= 38) return 'Csb';
+      return 'Csa';
+    }
+    // 西岸寄り 0.05-0.15: 地中海延長 or BSk
+    if (westFrac < 0.15) {
+      if (absLat >= 42) return 'Cfb';
+      return 'Csb';
+    }
+    // 東岸近接 (eastCoast 3°以内 or westFrac > 0.95): Cfa or Dfa
+    if (veryEastCoast || westFrac > 0.93) {
       if (latDeg > 0 && absLat >= 45) return 'Dfa';
       return 'Cfa';
     }
-    // フォールスルーは Cfb（穏やかな温帯）
-    return 'Cfb';
+    // 東寄り (westFrac 0.78-0.93): Cfa（東岸湿潤の延長）
+    if (westFrac > 0.78) {
+      if (latDeg > 0 && absLat >= 45) return 'Dfa';
+      return 'Cfa';
+    }
+    // 中央寄り東 (westFrac 0.55-0.78): NH なら Dwa/Dwb（東中央 = 冬季少雨大陸）
+    if (westFrac > 0.55) {
+      if (latDeg > 0) {
+        return absLat >= 45 ? 'Dwb' : 'Dwa';
+      }
+      return 'BSk';
+    }
+    // 中央〜西中央 (westFrac 0.15-0.55): NH なら BSk（dry interior）
+    if (latDeg > 0) {
+      // 35-42°: BSk が西方の BW へ繋がる
+      if (absLat < 42) return 'BSk';
+      // 42-50°: Dfb（湿潤大陸性、シベリア西〜東欧 analog）
+      return 'Dfb';
+    }
+    return 'Cfb'; // SH fallback
   }
 
-  // ===== §B/C 亜熱帯（25-35°） =====
+  // ===== §B 亜熱帯（25-35°）BW を西岸〜中央 (westFrac < 0.65) で広く =====
   if (absLat >= 25 && absLat < 35) {
-    // 西岸近接: Csa / Csb 地中海性（30-35°）or BWh（25-30°）
+    // 西岸近接（30-35°）: Csa（地中海）。25-30° 西岸は BWh のまま
     if (veryWestCoast) {
       if (absLat >= 32) return 'Csa';
       return 'BWh';
     }
     // 東岸近接: Cfa 湿潤亜熱帯
     if (veryEastCoast) return 'Cfa';
-    // 中央部・内陸: BW（NH 主体）, BS
-    if (isCenter) return 'BWh';
-    // 中間: BS
-    if (isEastSide) return 'Cwa'; // 温暖冬季少雨（東岸寄りの大陸内 BS-Cfa 境界）
-    return 'BSh';
+    // **BW 貫入**: westFrac < 0.65 で BW（西岸の Sahara が中央まで広がる）
+    if (westFrac < 0.65) return 'BWh';
+    // 東寄り（westFrac 0.65-0.90）: Cwa（温暖冬季少雨、East Asia interior analog）
+    if (westFrac < 0.90) return 'Cwa';
+    // 東岸最寄り（westFrac > 0.90）: Cfa（モンスーン+暖流で湿潤）
+    return 'Cfa';
   }
 
-  // ===== §B 乾燥帯（15-25°） =====
+  // ===== §B 乾燥帯（15-25°）BW 中央＋西岸、東岸 Aw/Cwa =====
   if (absLat >= 15 && absLat < 25) {
-    // 西岸近接: BWh（cold current + subtropical high）
     if (veryWestCoast) return 'BWh';
-    // 東岸近接: Aw or Cwa
+    // 東岸近接: Aw / Cwa
     if (veryEastCoast) {
       if (absLat < 20) return 'Aw';
       return 'Cwa';
     }
-    // 中央部: BWh（NH > SH）
-    if (isCenter) return 'BWh';
-    // 中間: BSh（ステップ）
-    return 'BSh';
+    // **BW 西岸〜中央 westFrac < 0.55**
+    if (westFrac < 0.55) return 'BWh';
+    // 中央〜東寄り (0.55-0.85): Aw（サバナ、Sahel analog）
+    if (westFrac < 0.85) return 'Aw';
+    // 東寄り (0.85-): Cwa（東岸モンスーン縁）
+    return absLat >= 20 ? 'Cwa' : 'Aw';
   }
 
-  // ===== §A 熱帯（0-15°） =====
-  if (absLat < 15) {
-    // 高緯度寄り（10-15°）: Aw or Cwa
-    if (absLat >= 10) {
-      if (veryEastCoast) return 'Cwa';
-      return 'Aw';
-    }
-    // 中緯度寄り（5-10°）: 東岸 Am, 西岸 Aw, 中央 Aw
-    if (absLat >= 5) {
-      if (veryEastCoast) return 'Am';
-      if (veryWestCoast) return 'Aw';
-      return 'Aw';
-    }
-    // 赤道直下（0-5°）: Af 主体、ただし
-    //   - 東岸寄り: Af（trade wind onshore + warm current）
-    //   - 西岸寄り: Am（弱い乾季）
-    //   - 大陸中央内陸: Af
-    if (veryWestCoast) return 'Am';
+  // ===== §A 熱帯（5-15°）Aw 中心、西岸 Aw、東岸 Aw / Cwa =====
+  if (absLat >= 10 && absLat < 15) {
+    // どこも基本 Aw（"Am でない" の FB 反映）。東岸 14-15° のみ Cwa 候補
+    if (veryEastCoast && absLat >= 13) return 'Cwa';
+    return 'Aw';
+  }
+  if (absLat >= 5 && absLat < 10) {
+    // 西岸 Aw、中央 Aw、東岸 Am〜Aw（東岸寄りで monsoon）
+    if (veryEastCoast) return 'Am';
+    if (westFrac > 0.75) return 'Am';
+    return 'Aw';
+  }
+
+  // ===== §A 赤道帯（0-5°）Af 東側伸展 =====
+  if (absLat < 5) {
+    // 西岸寄り (westFrac < 0.20): Am（西岸の弱い乾季、West Africa analog）
+    if (westFrac < 0.20) return 'Am';
+    // それ以外（westFrac >= 0.20）: Af（東に広く伸展）
     return 'Af';
   }
 
   return 'BSk';
 }
 
-console.log('Assigning Köppen zones (geographico-style rules) ...');
-const zones: (string | null)[][] = new Array(rows);
-const counts: Record<string, number> = {};
+/**
+ * 第 2 pass（[P4-51]、ユーザ FB「BW の周りが BS で囲われていない」）:
+ *   BW セルに隣接する非 B 群セル（A 群 / C 群）を BS に置換する ring を作る。
+ *   Aw / Cwa / Cfa などとの境界を BSh で柔らかくつなぐ。
+ *   wrap-around 経度 + 緯度 ±1 行を 1 重 ring としてスキャン。
+ */
+function ringBwWithBs(zones: (string | null)[][]): (string | null)[][] {
+  const out: (string | null)[][] = zones.map((row) => [...row]);
+  // Cs (地中海性) と Cfb (西岸海洋性) は BW から離れた西岸寄りに分布するので
+  // 保護する（境界変換の対象外）。Aw / Cfa / Cwa などは BS で柔らかく繋ぐ。
+  const protectedTargets = new Set(['Csa', 'Csb', 'Cfb']);
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const z = zones[i]![j];
+      if (!z || !z.startsWith('BW')) continue; // BW のみが ring の起点（BS 自身は ring 起点に含めない）
+      for (const [di, dj] of [
+        [0, 1],
+        [0, -1],
+        [1, 0],
+        [-1, 0],
+      ]) {
+        const ni = i + di;
+        if (ni < 0 || ni >= rows) continue;
+        const nj = ((j + dj) % cols + cols) % cols;
+        const nz = zones[ni]![nj];
+        if (!nz) continue;
+        if (nz.startsWith('B')) continue; // B-B 境界はそのまま
+        if (nz.startsWith('E')) continue; // 寒帯境界はそのまま
+        if (protectedTargets.has(nz)) continue; // Cs / Cfb は保護
+        // 残り (A 群 / Cwa / Cfa / D 群) との境界 → BS に変換
+        const targetIsHot = nz.startsWith('A') || nz === 'Cwa' || nz === 'Cfa';
+        out[ni]![nj] = targetIsHot ? 'BSh' : 'BSk';
+      }
+    }
+  }
+  return out;
+}
+
+console.log('Assigning Köppen zones (geographico-style rules, P4-51 修正版) ...');
+const initialZones: (string | null)[][] = new Array(rows);
 for (let r = 0; r < rows; r++) {
   const row: (string | null)[] = new Array(cols);
+  for (let c = 0; c < cols; c++) row[c] = assignKoppen(r, c);
+  initialZones[r] = row;
+}
+console.log('Applying BS ring around BW (2nd pass) ...');
+const zones = ringBwWithBs(initialZones);
+const counts: Record<string, number> = {};
+for (let r = 0; r < rows; r++) {
   for (let c = 0; c < cols; c++) {
-    const z = assignKoppen(r, c);
-    row[c] = z;
+    const z = zones[r]![c];
     if (z) counts[z] = (counts[z] || 0) + 1;
   }
-  zones[r] = row;
 }
 console.log('Zone histogram:');
 for (const [z, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
