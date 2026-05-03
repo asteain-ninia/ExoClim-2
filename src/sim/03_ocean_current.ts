@@ -741,25 +741,83 @@ function buildAllCollisionPoints(
   for (const basin of basins) {
     const westernBoundaryLon = rotationSign === 1 ? basin.startLonDeg : basin.endLonDeg;
     for (const hemisphereSign of [1, -1] as const) {
-      // 赤道流衝突点（西岸境界流の起点）
-      result.push({
-        type: 'equatorial_current',
-        position: {
-          latitudeDeg: hemisphereSign * equatorialLatDeg,
-          longitudeDeg: westernBoundaryLon,
-        },
-      });
-      // 極側流衝突点（西縁復帰流の起点）
-      result.push({
-        type: 'polar_current',
-        position: {
-          latitudeDeg: hemisphereSign * polarLatitudeDeg,
-          longitudeDeg: westernBoundaryLon,
-        },
-      });
+      // ±equatorialLat 行では大陸形状が equator 行と異なり、basin 西縁経度の
+      // セルが陸であることがある。海側（順行=東 / 逆行=西）にスナップして
+      // マーカーを海セル上に置く。当該緯度行に近隣の海が無ければマーカーを
+      // 出さない（[現状.md §6 ユーザ指摘 2026-05-03、P4-47]）。
+      const eqLon = snapToSeaCellLon(
+        grid,
+        hemisphereSign * equatorialLatDeg,
+        westernBoundaryLon,
+        rotationSign,
+      );
+      if (eqLon !== null) {
+        result.push({
+          type: 'equatorial_current',
+          position: {
+            latitudeDeg: hemisphereSign * equatorialLatDeg,
+            longitudeDeg: eqLon,
+          },
+        });
+      }
+      const polarLon = snapToSeaCellLon(
+        grid,
+        hemisphereSign * polarLatitudeDeg,
+        westernBoundaryLon,
+        rotationSign,
+      );
+      if (polarLon !== null) {
+        result.push({
+          type: 'polar_current',
+          position: {
+            latitudeDeg: hemisphereSign * polarLatitudeDeg,
+            longitudeDeg: polarLon,
+          },
+        });
+      }
     }
   }
   return result;
+}
+
+/**
+ * 衝突点マーカーを「陸セル上に来ない」位置に補正する（P4-47、ユーザ指摘）。
+ *
+ * 引数:
+ *   - latDeg: マーカーの目標緯度（±equatorialLat 等）
+ *   - referenceLon: 当初の経度（equator 行で求めた basin 西縁）
+ *   - rotationSign: 1 = 順行（順行では basin の西縁が衝突側 → 海側は東）、
+ *                   -1 = 逆行（東縁衝突 → 海側は西）
+ *
+ * 戻り値: 海セル中心の経度。当該緯度行に近隣（±30°）の海セルが無ければ null。
+ */
+function snapToSeaCellLon(
+  grid: Grid,
+  latDeg: number,
+  referenceLon: number,
+  rotationSign: 1 | -1,
+): number | null {
+  const rows = grid.latitudeCount;
+  const cols = grid.longitudeCount;
+  const res = grid.resolutionDeg;
+  const r = Math.max(0, Math.min(rows - 1, Math.round((latDeg + 90) / res - 0.5)));
+  const startC = Math.max(0, Math.min(cols - 1, Math.round((referenceLon + 180) / res - 0.5)));
+  const row = grid.cells[r];
+  if (!row) return null;
+  // 既に海なら referenceLon をそのまま返す（既存テスト互換: basin 境界経度を保持）
+  if (row[startC]?.isLand !== true) return referenceLon;
+  // 海側方向: 順行=東 (lon 増 / c 増)、逆行=西 (lon 減 / c 減)
+  // 同方向で見つからなければ反対方向も探索する（極帯では「basin 内側」が逆方向のことがある）
+  const maxStepCells = Math.round(30 / res); // 30°
+  for (const step of [rotationSign === 1 ? 1 : -1, rotationSign === 1 ? -1 : 1]) {
+    for (let k = 1; k <= maxStepCells; k++) {
+      const c = ((startC + step * k) % cols + cols) % cols;
+      if (row[c]?.isLand !== true) {
+        return row[c]!.longitudeDeg;
+      }
+    }
+  }
+  return null;
 }
 
 /**

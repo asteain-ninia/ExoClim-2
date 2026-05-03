@@ -17,6 +17,7 @@ import {
   classificationFromCorrection,
   computeOceanCurrent,
 } from '@/sim/03_ocean_current';
+import { buildTerrainGrid } from '@/domain/terrain';
 
 const baseGrid = (resolutionDeg: GridResolutionDeg = 2): Grid => createGrid(resolutionDeg);
 
@@ -1126,6 +1127,38 @@ describe('sim/03_ocean_current: 衝突点（[docs/spec/03_海流.md §4.5 / §4.
       baseWindBelt(EARTH_PLANET_PARAMS, grid),
     );
     expect(result.monthlyCollisionPoints[0]?.length).toBe(0);
+  });
+
+  it('衝突点マーカーは常に海セル上に配置される（[ユーザ指摘 2026-05-03]、P4-47）', () => {
+    // equator 行で basin が見つかった経度に、±eqLat / ±polarLat 行では陸が
+    // 存在することがある。マーカー位置を当該緯度で海セルにスナップする補正が
+    // 効いていることを確認する。
+    // 仮想大陸（idealized_continent）= 経度中央寄せの単一連続陸塊で再現性高い。
+    const grid = buildTerrainGrid(
+      { kind: 'preset', presetId: 'idealized_continent' },
+      1,
+    );
+    const result = computeOceanCurrent(
+      EARTH_PLANET_PARAMS,
+      grid,
+      baseITCZ(EARTH_PLANET_PARAMS, grid),
+      baseWindBelt(EARTH_PLANET_PARAMS, grid),
+    );
+    for (let m = 0; m < 12; m++) {
+      const month = result.monthlyCollisionPoints[m]!;
+      for (const p of month) {
+        const r = Math.round((p.position.latitudeDeg + 90) / grid.resolutionDeg - 0.5);
+        const c = Math.round((p.position.longitudeDeg + 180) / grid.resolutionDeg - 0.5);
+        const rClamp = Math.max(0, Math.min(grid.latitudeCount - 1, r));
+        const cClamp = ((c % grid.longitudeCount) + grid.longitudeCount) % grid.longitudeCount;
+        const cell = grid.cells[rClamp]?.[cClamp];
+        expect(cell, `marker @ lat=${p.position.latitudeDeg}, lon=${p.position.longitudeDeg}`).toBeDefined();
+        expect(
+          cell?.isLand,
+          `Collision marker (${p.type}) at (lat=${p.position.latitudeDeg.toFixed(2)}, lon=${p.position.longitudeDeg.toFixed(2)}) is on a LAND cell`,
+        ).toBe(false);
+      }
+    }
   });
 });
 
