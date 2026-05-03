@@ -28,6 +28,7 @@ import {
   PrecipitationStepParamsSliders,
   ResetButton,
   SeasonSelector,
+  SettingsIoButtons,
   TemperatureStepParamsSliders,
   TerrainSourceSelector,
   Toast,
@@ -62,6 +63,7 @@ export function App() {
           <div className="app__header-actions">
             <LoadingIndicator />
             <ExportPngButton />
+            <SettingsIoButtons />
             <ResetButton />
           </div>
         </div>

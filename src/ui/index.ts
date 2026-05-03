@@ -6,6 +6,7 @@ export { ExportPngButton } from './ExportPngButton';
 export { Footer } from './Footer';
 export { LoadingIndicator } from './LoadingIndicator';
 export { ResetButton } from './ResetButton';
+export { SettingsIoButtons } from './SettingsIoButtons';
 export { Toast } from './Toast';
 
 export {

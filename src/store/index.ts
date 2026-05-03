@@ -28,3 +28,6 @@ export type {
   NotificationsStore,
 } from './notifications';
 export { createNotificationsStore, useNotificationsStore } from './notifications';
+
+export type { ParamsSnapshot, ParamsSnapshotPayload } from './settingsIo';
+export { applySnapshot, isValidSnapshot, serializeParams } from './settingsIo';
