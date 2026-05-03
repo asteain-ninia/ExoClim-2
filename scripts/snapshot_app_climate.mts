@@ -68,7 +68,8 @@ const KOPPEN: Record<string, [number, number, number]> = {
 };
 
 console.log('Running pipeline on idealized_continent ...');
-const grid = buildTerrainGrid({ kind: 'preset', presetId: 'idealized_continent' }, 1);
+// [P4-72] resolution 1 を渡さない (default 0.5 を使う)
+const grid = buildTerrainGrid({ kind: 'preset', presetId: 'idealized_continent' });
 const itcz = computeITCZ(EARTH_PLANET_PARAMS, grid, DEFAULT_ITCZ_STEP_PARAMS);
 const windBelt = computeWindBelt(
   EARTH_PLANET_PARAMS,

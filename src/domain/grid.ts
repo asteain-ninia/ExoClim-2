@@ -11,8 +11,15 @@
  */
 export type GridResolutionDeg = 0.5 | 1 | 2;
 
-/** 既定解像度（要件定義書 §4.1）。 */
-export const DEFAULT_GRID_RESOLUTION_DEG: GridResolutionDeg = 1;
+/**
+ * 既定解像度（要件定義書 §4.1）。
+ * [P4-72] 1° → 0.5° に高解像度化。zone 境界の「カックカク」根本解消 +
+ * km-aware ルール (Pasta WL#28「2000 km from coast」等) の前段。
+ * 4x cell count で perf は ~4-5x（pipeline 全体で 10-15s 程度）。
+ * テスト系は明示的に `createGrid(1)` / `baseGrid(2)` を指定する箇所が多く、
+ * 影響は production (App.tsx + connection.ts) のみ。
+ */
+export const DEFAULT_GRID_RESOLUTION_DEG: GridResolutionDeg = 0.5;
 
 /**
  * 緯度経度格子の単一セル。

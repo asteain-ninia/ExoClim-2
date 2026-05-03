@@ -7,8 +7,8 @@ import {
 
 describe('domain/grid: Grid / Cell 型と createGrid 生成器', () => {
   describe('解像度ごとのセル数（要件定義書 §4.1）', () => {
-    it('既定解像度は 1° である', () => {
-      expect(DEFAULT_GRID_RESOLUTION_DEG).toBe(1);
+    it('既定解像度は 0.5° である（[P4-72] zone 境界カックカク解消 + km-aware の前段）', () => {
+      expect(DEFAULT_GRID_RESOLUTION_DEG).toBe(0.5);
     });
 
     it.each<[GridResolutionDeg, number, number]>([
@@ -26,10 +26,10 @@ describe('domain/grid: Grid / Cell 型と createGrid 生成器', () => {
       }
     });
 
-    it('1° 既定で 64,800 セルとなる（180×360）', () => {
+    it('0.5° 既定で 259,200 セルとなる（360×720、[P4-72]）', () => {
       const grid = createGrid();
       const total = grid.cells.reduce((acc, row) => acc + row.length, 0);
-      expect(total).toBe(64_800);
+      expect(total).toBe(259_200);
     });
   });
 
