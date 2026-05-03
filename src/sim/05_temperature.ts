@@ -262,7 +262,12 @@ function computeLatitudeBaseTemperatureCelsius(
     axialTiltDeg,
     orbitalDistanceFactorPerMonth,
   );
-  const planetaryAlbedo = Math.min(0.95, surfaceAlbedo + cloudAlbedo * 0.5);
+  // [P4-52 fix] planetary albedo = 50/50 雲被覆混合の重み付き平均
+  // 旧式 `surface + cloud*0.5` だと surface 0.15 + cloud 0.5 で planetary = 0.40 と
+  // なり実 Earth (0.30) より 10pt 高く、equator annualMean が 16°C と異常に低かった。
+  // 新式は「天空の 50% を雲、50% を表面が占める」物理直感に従う加重平均で
+  // 0.5*0.5 + 0.5*0.15 = 0.325 ≈ Earth 0.30。
+  const planetaryAlbedo = Math.min(0.95, 0.5 * cloudAlbedo + 0.5 * surfaceAlbedo);
   const absorbedFraction = 1 - planetaryAlbedo;
   const earthAbsorbedFraction = 1 - EARTH_REFERENCE_PLANETARY_ALBEDO;
 

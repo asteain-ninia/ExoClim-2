@@ -22,6 +22,8 @@ import { computeWindBelt, DEFAULT_WIND_BELT_STEP_PARAMS } from '../src/sim/02_wi
 import { computeOceanCurrent } from '../src/sim/03_ocean_current';
 import { computeAirflow, DEFAULT_AIRFLOW_STEP_PARAMS } from '../src/sim/04_airflow';
 import { computeTemperature, DEFAULT_TEMPERATURE_STEP_PARAMS } from '../src/sim/05_temperature';
+import { computePrecipitation, DEFAULT_PRECIPITATION_STEP_PARAMS } from '../src/sim/06_precipitation';
+import { computeClimateZone, DEFAULT_CLIMATE_ZONE_STEP_PARAMS } from '../src/sim/07_climate_zone';
 
 console.log('Generating idealized continent terrain ...');
 const grid = buildTerrainGrid({ kind: 'preset', presetId: 'idealized_continent' }, 1);
@@ -53,26 +55,22 @@ const temp = computeTemperature(
   airflow,
   DEFAULT_TEMPERATURE_STEP_PARAMS,
 );
-
-// 緯度 30°N 行をサンプリング: 大陸幅内の 10 経度（西端〜東端均等）と
-// その coastal correction (Step 3 出力)、land cell の温度（Step 5 出力）を見る
-const targetLatDeg = 30;
-const r = Math.round((targetLatDeg + 90) / 1 - 0.5);
-console.log(`\n=== Latitude ${targetLatDeg}°N (grid row ${r}) ===\n`);
-
-// 大陸幅を測定
-const landCols: number[] = [];
-for (let c = 0; c < cols; c++) {
-  if (grid.cells[r]![c]!.isLand) landCols.push(c);
-}
-if (landCols.length === 0) {
-  console.log('No land at this latitude. Aborting.');
-  process.exit(0);
-}
-console.log(
-  `Continent at lat ${targetLatDeg}°: ${landCols.length} land cells, ` +
-    `lon range = [${grid.cells[r]![landCols[0]!]!.longitudeDeg.toFixed(1)}, ` +
-    `${grid.cells[r]![landCols[landCols.length - 1]!]!.longitudeDeg.toFixed(1)}]°`,
+const precip = computePrecipitation(
+  EARTH_PLANET_PARAMS,
+  grid,
+  itcz,
+  windBelt,
+  ocean,
+  airflow,
+  temp,
+  DEFAULT_PRECIPITATION_STEP_PARAMS,
+);
+const climate = computeClimateZone(
+  EARTH_PLANET_PARAMS,
+  grid,
+  precip,
+  temp,
+  DEFAULT_CLIMATE_ZONE_STEP_PARAMS,
 );
 
 // 各 land cell の winterMin（最寒月）を計算
@@ -85,102 +83,86 @@ function winterMinFor(i: number, j: number): number {
   return minT;
 }
 
-console.log('\n--- Per-cell dump (10 evenly spaced positions across continent) ---');
-console.log(
-  ['idx', 'lonDeg', 'land', 'oceanCorr@cell', 'oceanCorr@nearestSea', 'winterMin', 'classification'].join('\t'),
-);
-
-const samplePositions: number[] = [];
-const N = 10;
-for (let k = 0; k < N; k++) {
-  const idx = Math.floor((k / (N - 1)) * (landCols.length - 1));
-  samplePositions.push(landCols[idx]!);
+function dumpRow(targetLatDeg: number, label: string): void {
+  const r = Math.round((targetLatDeg + 90) / 1 - 0.5);
+  const landColsLocal: number[] = [];
+  for (let c = 0; c < cols; c++) if (grid.cells[r]![c]!.isLand) landColsLocal.push(c);
+  if (landColsLocal.length === 0) {
+    console.log(`\n=== ${label} (lat ${targetLatDeg}°): no land. ===`);
+    return;
+  }
+  console.log(`\n=== ${label} (lat ${targetLatDeg}°, grid row ${r}) ===`);
+  console.log(['lon', 'winterMin', 'annualMean', 'annualPrecip', 'zone'].join('\t'));
+  const samples: number[] = [];
+  const N = 12;
+  for (let k = 0; k < N; k++) {
+    samples.push(landColsLocal[Math.floor((k / (N - 1)) * (landColsLocal.length - 1))]!);
+  }
+  for (const c of samples) {
+    const cell = grid.cells[r]![c]!;
+    const wMin = winterMinFor(r, c);
+    let aSum = 0;
+    for (let m = 0; m < 12; m++) aSum += temp.monthlyTemperatureCelsius[m]?.[r]?.[c] ?? 0;
+    const aMean = aSum / 12;
+    let pSum = 0;
+    for (let m = 0; m < 12; m++) {
+      const lab = precip.monthlyPrecipitationLabels[m]?.[r]?.[c];
+      const mm = lab === 'dry' ? 10 : lab === 'normal' ? 60 : lab === 'wet' ? 120 : lab === 'very_wet' ? 240 : 0;
+      pSum += mm;
+    }
+    const zone = climate.zoneCodes[r]?.[c] ?? '-';
+    console.log(
+      [
+        cell.longitudeDeg.toFixed(1).padStart(6),
+        wMin.toFixed(1).padStart(7),
+        aMean.toFixed(1).padStart(7),
+        pSum.toFixed(0).padStart(6),
+        String(zone).padStart(4),
+      ].join('\t'),
+    );
+  }
 }
 
-for (const c of samplePositions) {
-  const cell = grid.cells[r]![c]!;
-  const winterMin = winterMinFor(r, c);
-  // Step 3 coastal correction at this cell (always 0 for land)
-  let totalCorr = 0;
-  for (let m = 0; m < 12; m++) {
-    totalCorr += ocean.monthlyCoastalTemperatureCorrectionCelsius[m]?.[r]?.[c] ?? 0;
-  }
-  const meanCorr = totalCorr / 12;
-  // Nearest sea cell correction (search ±20 cols)
-  let nearestSeaCorr = 0;
-  let nearestDist = Infinity;
-  for (let dc = -20; dc <= 20; dc++) {
-    const nc = ((c + dc) % cols + cols) % cols;
-    if (!grid.cells[r]![nc]!.isLand && Math.abs(dc) < nearestDist) {
-      nearestDist = Math.abs(dc);
-      let sum = 0;
-      for (let m = 0; m < 12; m++)
-        sum += ocean.monthlyCoastalTemperatureCorrectionCelsius[m]?.[r]?.[nc] ?? 0;
-      nearestSeaCorr = sum / 12;
-    }
-  }
-  // Classification at nearest sea cell
-  const classCount = { warm: 0, cold: 0, neutral: 0 };
-  for (let dc = -3; dc <= 3; dc++) {
-    const nc = ((c + dc) % cols + cols) % cols;
-    if (grid.cells[r]![nc]!.isLand) continue;
-    for (let m = 0; m < 12; m++) {
-      const corr = ocean.monthlyCoastalTemperatureCorrectionCelsius[m]?.[r]?.[nc] ?? 0;
-      if (corr > 0.5) classCount.warm++;
-      else if (corr < -0.5) classCount.cold++;
-      else classCount.neutral++;
-    }
-  }
-  const dominantCls =
-    classCount.warm > classCount.cold && classCount.warm > classCount.neutral
-      ? 'warm'
-      : classCount.cold > classCount.neutral
-        ? 'cold'
-        : 'neutral';
+dumpRow(60, '60°N (Df / Dw 帯)');
+dumpRow(45, '45°N (温帯)');
+dumpRow(30, '30°N (亜熱帯 BWh / Cs / Cfa)');
+dumpRow(20, '20°N (乾燥帯 BWh)');
+dumpRow(10, '10°N (Aw / Am)');
+dumpRow(0, '0° (Af 赤道)');
+dumpRow(-30, '30°S (亜熱帯 SH)');
 
+// 全大陸 zone code の集計（東西非対称性の有無を定量評価）
+function summarizeZoneAsymmetry(latDeg: number): void {
+  const r = Math.round((latDeg + 90) / 1 - 0.5);
+  const landColsLocal: number[] = [];
+  for (let c = 0; c < cols; c++) if (grid.cells[r]![c]!.isLand) landColsLocal.push(c);
+  if (landColsLocal.length < 4) return;
+  const half = Math.floor(landColsLocal.length / 2);
+  const westCells = landColsLocal.slice(0, half);
+  const eastCells = landColsLocal.slice(landColsLocal.length - half);
+  const westZones = new Set<string>();
+  const eastZones = new Set<string>();
+  for (const c of westCells) {
+    const z = climate.zoneCodes[r]?.[c];
+    if (z) westZones.add(z);
+  }
+  for (const c of eastCells) {
+    const z = climate.zoneCodes[r]?.[c];
+    if (z) eastZones.add(z);
+  }
+  const westOnly = [...westZones].filter((z) => !eastZones.has(z));
+  const eastOnly = [...eastZones].filter((z) => !westZones.has(z));
+  const both = [...westZones].filter((z) => eastZones.has(z));
   console.log(
-    [
-      String(c).padStart(3),
-      cell.longitudeDeg.toFixed(1).padStart(7),
-      cell.isLand ? 'L' : 'O',
-      meanCorr.toFixed(2).padStart(6),
-      nearestSeaCorr.toFixed(2).padStart(6),
-      winterMin.toFixed(2).padStart(7),
-      dominantCls.padStart(8),
-    ].join('\t'),
+    `\nlat ${String(latDeg).padStart(4)}°: west zones = {${[...westZones].join(',')}}, ` +
+      `east zones = {${[...eastZones].join(',')}}`,
+  );
+  console.log(
+    `  west-only: [${westOnly.join(',')}] | east-only: [${eastOnly.join(',')}] | both: [${both.join(',')}]`,
   );
 }
 
-// 西端 vs 東端の差を集計
-const westmostC = landCols[0]!;
-const eastmostC = landCols[landCols.length - 1]!;
-const westWinter = winterMinFor(r, westmostC);
-const eastWinter = winterMinFor(r, eastmostC);
-console.log(
-  `\nWest coast (lon=${grid.cells[r]![westmostC]!.longitudeDeg.toFixed(1)}°) winterMin = ${westWinter.toFixed(2)}°C`,
-);
-console.log(
-  `East coast (lon=${grid.cells[r]![eastmostC]!.longitudeDeg.toFixed(1)}°) winterMin = ${eastWinter.toFixed(2)}°C`,
-);
-console.log(`Δ(east - west) = ${(eastWinter - westWinter).toFixed(2)}°C`);
-console.log(
-  '\n期待（物理的）: 東岸暖流 → 東岸が西岸より暖かい → Δ > 0',
-);
-console.log(
-  '現状予想: Step 3 coastal correction は ocean cell only → land で同緯度同温 → Δ ≈ 0',
-);
-
-// 同様に lat=10°N（赤道帯）でも見る
-console.log('\n=== Latitude 10°N: equatorial test ===');
-const r10 = Math.round((10 + 90) / 1 - 0.5);
-const landCols10: number[] = [];
-for (let c = 0; c < cols; c++) {
-  if (grid.cells[r10]![c]!.isLand) landCols10.push(c);
-}
-if (landCols10.length > 0) {
-  const w10 = winterMinFor(r10, landCols10[0]!);
-  const e10 = winterMinFor(r10, landCols10[landCols10.length - 1]!);
-  console.log(`West coast winterMin = ${w10.toFixed(2)}°C`);
-  console.log(`East coast winterMin = ${e10.toFixed(2)}°C`);
-  console.log(`Δ = ${(e10 - w10).toFixed(2)}°C`);
+console.log('\n=== 東西非対称性集計（zone codes） ===');
+for (const lat of [60, 50, 40, 30, 20, 10, 0, -10, -20, -30]) {
+  summarizeZoneAsymmetry(lat);
 }
