@@ -5,8 +5,15 @@ export { AdvancedModeToggle } from './AdvancedModeToggle';
 export { CollapsibleSection } from './CollapsibleSection';
 export { ExportPngButton } from './ExportPngButton';
 export { Footer } from './Footer';
+export { HelpButton } from './HelpButton';
 export { KeyboardShortcuts } from './KeyboardShortcuts';
 export { LoadingIndicator } from './LoadingIndicator';
+export {
+  ONBOARDING_LOCAL_STORAGE_KEY,
+  ONBOARDING_LOCAL_STORAGE_VALUE,
+  OnboardingModal,
+  resetOnboardingFlag,
+} from './OnboardingModal';
 export { ResetButton } from './ResetButton';
 export { SettingsIoButtons } from './SettingsIoButtons';
 export { Toast } from './Toast';

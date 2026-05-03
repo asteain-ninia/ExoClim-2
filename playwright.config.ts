@@ -14,6 +14,20 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5180',
     trace: 'on-first-retry',
+    // P4-44: オンボーディングモーダル既読フラグを既定で localStorage に
+    // 仕込んでおき、既存 E2E がモーダルにブロックされないようにする。
+    // モーダル表示自体を検証する p4-44-onboarding.spec.ts は test.use で
+    // 空 origins に上書きする。
+    // ([src/ui/OnboardingModal.tsx])
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'http://localhost:5180',
+          localStorage: [{ name: 'exoclim-onboarded', value: 'v1' }],
+        },
+      ],
+    },
   },
   projects: [
     {

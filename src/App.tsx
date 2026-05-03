@@ -19,12 +19,14 @@ import {
   CollapsibleSection,
   ExportPngButton,
   Footer,
+  HelpButton,
   ITCZStepParamsSliders,
   KeyboardShortcuts,
   Legend,
   LoadingIndicator,
   MapCanvas,
   OceanCurrentStepParamsSliders,
+  OnboardingModal,
   OrbitalSliders,
   PlanetBodySliders,
   PrecipitationStepParamsSliders,
@@ -65,6 +67,7 @@ export function App() {
           <div className="app__header-actions">
             <LoadingIndicator />
             <AdvancedModeToggle />
+            <HelpButton />
             <ExportPngButton />
             <SettingsIoButtons />
             <ResetButton />
@@ -165,6 +168,7 @@ export function App() {
       <Footer />
       <Toast />
       <KeyboardShortcuts />
+      <OnboardingModal />
     </div>
   );
 }
