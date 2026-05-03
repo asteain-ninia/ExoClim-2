@@ -147,6 +147,14 @@ export interface ClimateZoneStepParams {
   readonly tropicalExtensionMinAnnualMeanCelsius: number;
   /** A 群拡張: winterMin の下限（°C）。これより寒い冬を持つセルは拡張対象外。 */
   readonly tropicalExtensionMinWinterMinCelsius: number;
+  /**
+   * BS リング後処理を有効化するか（[P4-55]、ユーザ FB 2026-05-04）。
+   *
+   * BW（砂漠）セルに隣接する非 B/E/Cs/Cfb のセルを BS（ステップ）に変換する。
+   * Pasta WL#37 / 教科書「砂漠は必ずステップに囲まれる」を実現するため。
+   * 既定 true。無効化したい場合は false（A→BW の急変が現れる）。
+   */
+  readonly bsRingAroundBwEnabled: boolean;
 }
 
 export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
@@ -163,6 +171,7 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   tropicalExtensionEnabled: true,
   tropicalExtensionMinAnnualMeanCelsius: 22,
   tropicalExtensionMinWinterMinCelsius: 10,
+  bsRingAroundBwEnabled: true,
 };
 
 /** 月別気温・降水量の集約結果。 */
@@ -507,11 +516,56 @@ export function computeClimateZone(
     rationale[i] = ratRow;
   }
 
+  // §4.x [P4-55] BS リング後処理: BW セルに隣接する非 B/E ゾーン（A/C/D）を
+  // BS に置換してステップ気候の遷移帯を生成。Pasta WL#37 / 教科書的に
+  // 「砂漠は必ずステップに囲まれる」ためで、ring がないと A → BW の急変が
+  // 不自然（[現状.md ユーザ FB 2026-05-04]）。Cs / Cfb は protected。
+  if (params.bsRingAroundBwEnabled) {
+    applyBsRingAroundBw(zoneCodes);
+  }
+
   return {
     system: params.system,
     zoneCodes: zoneCodes as GridMap<ClimateZoneCode | null>,
     rationale: rationale as GridMap<ClimateZoneRationale | null>,
   };
+}
+
+/**
+ * BW セルに隣接する非 B/E/Cs/Cfb の land cell を BS に変換する 4 近傍 ring 処理。
+ * 入力 `zoneCodes` を in-place 改変する。
+ * - hot 隣接（A 群 / Cwa / Cfa） → BSh
+ * - cold 隣接（D 群） → BSk
+ * 既に BS のセルは ring 起点に含めない（無限拡大を防ぐ単一 pass 設計）
+ */
+function applyBsRingAroundBw(zoneCodes: (ClimateZoneCode | null)[][]): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const protectedTargets = new Set<string>(['Csa', 'Csb', 'Csc', 'Cfb', 'Cfc']);
+  const snapshot: (ClimateZoneCode | null)[][] = zoneCodes.map((row) => [...row]);
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const z = snapshot[i]![j];
+      if (!z || !z.startsWith('BW')) continue;
+      for (const [di, dj] of [
+        [0, 1],
+        [0, -1],
+        [1, 0],
+        [-1, 0],
+      ]) {
+        const ni = i + di;
+        if (ni < 0 || ni >= rows) continue;
+        const nj = ((j + dj) % cols + cols) % cols;
+        const nz = snapshot[ni]![nj];
+        if (!nz) continue;
+        if (nz.startsWith('B')) continue;
+        if (nz.startsWith('E')) continue;
+        if (protectedTargets.has(nz)) continue;
+        const targetIsHot = nz.startsWith('A') || nz === 'Cwa' || nz === 'Cfa';
+        zoneCodes[ni]![nj] = targetIsHot ? 'BSh' : 'BSk';
+      }
+    }
+  }
 }
 
 /**
