@@ -782,6 +782,34 @@ export function computePrecipitation(
           !inWindward &&
           !isITCZCoastalOnshore;
 
+        // [P4-70] 地中海性気候 Cs 形成: lat 30-42° 西岸（cold current adjacent）
+        // の冬月のみ wet。Pasta WL#37「subtropical high が冬には極側へ後退して
+        // storm track が西岸に来る」で、地中海/カリフォルニア/チリ analog の
+        // 「冬 wet + 夏 dry」を生成。
+        let isMediterraneanWinterWet = false;
+        if (
+          cell.isLand &&
+          absLat >= 30 &&
+          absLat <= 42 &&
+          isWinterMonthForLatitude(m, cell.latitudeDeg)
+        ) {
+          const monthCorr = oceanCurrentResult.monthlyCoastalTemperatureCorrectionCelsius[m];
+          // 西方向 5° 内に cold current 海 (corr < -1) があれば西岸寄り判定
+          for (let dc = 1; dc <= 5; dc++) {
+            const nj = ((j - dc) % cols + cols) % cols;
+            const nCell = grid.cells[i]?.[nj];
+            if (!nCell) continue;
+            if (nCell.isLand) {
+              if (dc <= 2) break;
+              continue;
+            }
+            if ((monthCorr?.[i]?.[nj] ?? 0) < -1) {
+              isMediterraneanWinterWet = true;
+              break;
+            }
+          }
+        }
+
         // [P4-57/58] Siberian high (NH 高緯度内陸 winter dry): lat 45-65°N の
         // **東半分内陸** に冬月 dry / 夏月 wet。Pasta「東アジア (Mongolia/NE 中国/
         // シベリア東部)」を再現。ユーザ FB「Dw 中央分布おかしい」(2026-05-04) で
@@ -845,6 +873,9 @@ export function computePrecipitation(
           labelRow[j] = 'wet';
         } else if (isContinentalSummerWet) {
           // [P4-57] NH 高緯度内陸の夏季対流性降水（Dw 形成のため夏 wet）
+          labelRow[j] = 'wet';
+        } else if (isMediterraneanWinterWet) {
+          // [P4-70] 地中海性気候 西岸 30-42° 冬季 wet（地中海/CA/チリ analog）
           labelRow[j] = 'wet';
         } else if (inITCZ && absLat < 15) {
           // [P4-54] ITCZ 圏内の対流性降水: 深熱帯（lat<15°）に限定。
