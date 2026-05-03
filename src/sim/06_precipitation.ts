@@ -666,8 +666,17 @@ export function computePrecipitation(
         const band = monthBands?.[j];
         const inITCZ = isInITCZBandAt(band, cell.latitudeDeg, params.itczInfluenceHalfWidthDeg);
 
-        // 暖流 wet（陸地のみ）
-        const inWarmWet = cell.isLand && warmMonthlyMask[i]?.[j] === true;
+        // 暖流 wet（陸地のみ）。
+        // [P4-60] 亜熱帯（lat 22-35°）の冬月では暖流 wet を抑制 → 冬季乾燥
+        // を作って Cwa（温暖冬季少雨気候）が東岸に出るようにする。Pasta WL#37
+        // 「亜熱帯モンスーン」の reverse 効果（夏 SE モンスーン onshore /
+        // 冬 NW continental offshore）を簡略実装。
+        const inWarmWetRaw = cell.isLand && warmMonthlyMask[i]?.[j] === true;
+        const isSubtropicalWinter =
+          absLat >= 22 &&
+          absLat <= 35 &&
+          isWinterMonthForLatitude(m, cell.latitudeDeg);
+        const inWarmWet = inWarmWetRaw && !isSubtropicalWinter;
         // 風上斜面 wet（陸地のみ）
         const inWindward = cell.isLand && orographic.windward[i]?.[j] === true;
         // 極前線（冬季のみ）
