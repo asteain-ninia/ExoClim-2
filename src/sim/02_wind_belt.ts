@@ -210,13 +210,32 @@ export function computeWindBelt(
           // §4.2 卓越風
           windRow[j] = prevailingWindAtLatitude(lat, rotationSign, params.meanWindSpeedMps);
 
-          // §4.3 + §4.4 気圧（帯状 + 大陸 anomaly）
+          // §4.3 + §4.4 気圧（帯状 + 大陸 anomaly + 海洋 dipole）
+          // [P4-74] ユーザ FB「圧力勾配風が緯度に沿いすぎ」(2026-05-04) への対応。
+          // 旧: 大陸の H/L 半分のみ → 経度方向勾配が小、ほぼ zonal な風に。
+          // 新: 大陸が L なら近隣海洋に H（dipole 化）→ 経度方向勾配が立ち、
+          //     gyre 風の H/L パターンが出て meridional 成分が増える。
           let p = basePressureHpa + zonalPressureAnomalyHpa(lat);
-          if (cell.isLand && declinationDeg !== 0) {
+          if (declinationDeg !== 0) {
             const inSummerHemisphere = Math.sign(lat) === sign;
-            p += inSummerHemisphere
-              ? -params.continentalPressureAnomalyHpa
-              : +params.continentalPressureAnomalyHpa;
+            // |lat| 15-50° でのみ dipole を生成（亜熱帯〜中緯度の Bermuda High analog）
+            if (Math.abs(lat) >= 15 && Math.abs(lat) <= 50) {
+              if (cell.isLand) {
+                p += inSummerHemisphere
+                  ? -params.continentalPressureAnomalyHpa
+                  : +params.continentalPressureAnomalyHpa;
+              } else {
+                // 海洋: 大陸と逆符号（dipole）。係数は半分（海洋の anomaly は小さめ）
+                p += inSummerHemisphere
+                  ? +params.continentalPressureAnomalyHpa * 0.5
+                  : -params.continentalPressureAnomalyHpa * 0.5;
+              }
+            } else if (cell.isLand) {
+              // 15° 未満 / 50° 超は大陸のみ（旧挙動）
+              p += inSummerHemisphere
+                ? -params.continentalPressureAnomalyHpa
+                : +params.continentalPressureAnomalyHpa;
+            }
           }
           pressureRow[j] = p;
 
