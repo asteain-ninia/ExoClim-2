@@ -9,7 +9,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type {
@@ -1380,7 +1379,10 @@ function drawMap(
  */
 export function MapCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [panOffsetPx, setPanOffsetPx] = useState(0);
+  // [P4-62] panOffsetPx を ui store に上げて KeyboardShortcuts (矢印キー) と
+  // 共有。マウスドラッグも同じ store action を使う。
+  const panOffsetPx = useUIStore((s) => s.panOffsetPx);
+  const setPanOffsetPx = useUIStore((s) => s.setPanOffsetPx);
   const dragRef = useRef<{ startClientX: number; startOffset: number } | null>(null);
 
   const itcz = useResultsStore((s) => s.itcz);
@@ -1633,7 +1635,7 @@ export function MapCanvas() {
         setHoveredCell(null);
       }
     },
-    [grid, panOffsetPx, setHoveredCell],
+    [grid, panOffsetPx, setHoveredCell, setPanOffsetPx],
   );
 
   const handlePointerUp = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {

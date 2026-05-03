@@ -115,4 +115,28 @@ describe('store/ui: UI 状態 store', () => {
       expect(store.getState().theme).toBe('dark');
     });
   });
+
+  describe('panOffsetPx / setPanOffsetPx / panBy ([P4-62])', () => {
+    it('初期値は 0', () => {
+      expect(store.getState().panOffsetPx).toBe(0);
+    });
+    it('setPanOffsetPx で絶対値を設定', () => {
+      store.getState().setPanOffsetPx(100);
+      expect(store.getState().panOffsetPx).toBe(100);
+      store.getState().setPanOffsetPx(-50);
+      expect(store.getState().panOffsetPx).toBe(-50);
+    });
+    it('panBy で相対値を加算（負も扱える）', () => {
+      store.getState().setPanOffsetPx(100);
+      store.getState().panBy(35);
+      expect(store.getState().panOffsetPx).toBe(135);
+      store.getState().panBy(-200);
+      expect(store.getState().panOffsetPx).toBe(-65);
+    });
+    it('reset で 0 に戻る', () => {
+      store.getState().setPanOffsetPx(500);
+      store.getState().reset();
+      expect(store.getState().panOffsetPx).toBe(0);
+    });
+  });
 });

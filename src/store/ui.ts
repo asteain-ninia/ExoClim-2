@@ -94,6 +94,13 @@ export interface UIState {
    * 反映する。localStorage に永続化される（key: 'exoclim-theme'）。
    */
   readonly theme: 'dark' | 'light';
+  /**
+   * Canvas の経度方向 pan offset（px、[現状.md §6 U7]、P4-62 追加）。
+   * MapCanvas は内部解像度 1260 px（経度 360°）で描画し、本値分シフト。
+   * マウスドラッグでも矢印キー（KeyboardShortcuts）でも更新される。
+   * 永続化対象外（リロードで 0 に戻る）。
+   */
+  readonly panOffsetPx: number;
 }
 
 export interface UIActions {
@@ -109,6 +116,10 @@ export interface UIActions {
   readonly setAdvancedMode: (enabled: boolean) => void;
   /** テーマを切替える（[P4-45]）。 */
   readonly setTheme: (theme: 'dark' | 'light') => void;
+  /** Canvas pan offset を設定する（絶対値、[P4-62]）。 */
+  readonly setPanOffsetPx: (px: number) => void;
+  /** Canvas pan offset を相対値で加算する（矢印キー / ドラッグ用、[P4-62]）。 */
+  readonly panBy: (deltaPx: number) => void;
   readonly reset: () => void;
 }
 
@@ -139,6 +150,7 @@ const INITIAL_UI_STATE: UIState = {
   isComputing: false,
   advancedMode: false,
   theme: 'dark',
+  panOffsetPx: 0,
 };
 
 export const createUIStore = () =>
@@ -154,6 +166,8 @@ export const createUIStore = () =>
     setIsComputing: (isComputing) => set({ isComputing }),
     setAdvancedMode: (advancedMode) => set({ advancedMode }),
     setTheme: (theme) => set({ theme }),
+    setPanOffsetPx: (panOffsetPx) => set({ panOffsetPx }),
+    panBy: (deltaPx) => set((state) => ({ panOffsetPx: state.panOffsetPx + deltaPx })),
     reset: () => set(INITIAL_UI_STATE),
   }));
 
