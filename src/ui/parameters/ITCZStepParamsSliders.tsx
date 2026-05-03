@@ -39,6 +39,7 @@ export function ITCZStepParamsSliders() {
         precision={0}
         value={itczParams.smoothingWindowDeg}
         defaultValue={DEFAULT_ITCZ_STEP_PARAMS.smoothingWindowDeg}
+        advanced
         onChange={(v) => setITCZParams({ smoothingWindowDeg: v })}
       />
       <Slider
@@ -64,6 +65,7 @@ export function ITCZStepParamsSliders() {
         precision={0}
         value={itczParams.mountainCutoffMeters}
         defaultValue={DEFAULT_ITCZ_STEP_PARAMS.mountainCutoffMeters}
+        advanced
         onChange={(v) => setITCZParams({ mountainCutoffMeters: v })}
       />
     </fieldset>

@@ -63,6 +63,7 @@ export function PrecipitationStepParamsSliders() {
         value={precipitationParams.windwardWetMinReliefMeters}
         defaultValue={DEFAULT_PRECIPITATION_STEP_PARAMS.windwardWetMinReliefMeters}
         helpText="風上斜面でこの起伏を超えると地形性降水で湿潤化（既定 1,000 m）。"
+        advanced
         onChange={(v) => setPrecipitationParams({ windwardWetMinReliefMeters: v })}
       />
       <Slider

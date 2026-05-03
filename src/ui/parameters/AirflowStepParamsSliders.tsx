@@ -61,6 +61,7 @@ export function AirflowStepParamsSliders() {
         value={airflowParams.pressureCenterThresholdHpa}
         defaultValue={DEFAULT_AIRFLOW_STEP_PARAMS.pressureCenterThresholdHpa}
         helpText="この hPa 以上の気圧異常を「気圧中心（H/L マーカー）」として検出。低いと小さな極小・極大も拾う。"
+        advanced
         onChange={(v) => setAirflowParams({ pressureCenterThresholdHpa: v })}
       />
     </fieldset>

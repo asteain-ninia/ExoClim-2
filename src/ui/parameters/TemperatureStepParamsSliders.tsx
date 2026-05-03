@@ -63,6 +63,7 @@ export function TemperatureStepParamsSliders() {
         value={temperatureParams.snowIceFeedbackIterations}
         defaultValue={DEFAULT_TEMPERATURE_STEP_PARAMS.snowIceFeedbackIterations}
         helpText="新規雪氷面（高アルベド）→ 冷却 → さらに雪氷拡大、を繰り返す回数（既定 2）。多いほど極氷帯が拡張。"
+        advanced
         onChange={(v) => setTemperatureParams({ snowIceFeedbackIterations: v })}
       />
       <Slider
@@ -76,6 +77,7 @@ export function TemperatureStepParamsSliders() {
         value={temperatureParams.evapotranspirationCoefficientMmPerCelsius}
         defaultValue={DEFAULT_TEMPERATURE_STEP_PARAMS.evapotranspirationCoefficientMmPerCelsius}
         helpText="蒸発散量 ≈ max(0, T) × 係数 の暫定線形式。Step 7 気候帯の B/D 判定で消費。Penman-Monteith 簡略版への置換は将来検討。"
+        advanced
         onChange={(v) =>
           setTemperatureParams({ evapotranspirationCoefficientMmPerCelsius: v })
         }
