@@ -649,6 +649,32 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slider__help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2a4055;
+  color: #aac8e0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: help;
+  user-select: none;
+  outline: none;
+}
+
+.slider__help:hover,
+.slider__help:focus-visible {
+  background: #4a6075;
+  color: #d8e6f4;
 }
 
 .slider__value {

@@ -23,6 +23,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.warmCurrentMaxRiseCelsius}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.warmCurrentMaxRiseCelsius}
+        helpText="暖流が沿岸域で気温に与える最大上昇量。Pasta 経験値 +15℃（西岸海洋性気候の主因）。"
         onChange={(v) => setOceanCurrentParams({ warmCurrentMaxRiseCelsius: v })}
       />
       <Slider
@@ -35,6 +36,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={1}
         value={oceanCurrentParams.coldCurrentMaxDropCelsius}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.coldCurrentMaxDropCelsius}
+        helpText="寒流が沿岸域で気温に与える最大下降量（絶対値）。Pasta 経験値 10℃（東岸寒冷化の主因）。"
         onChange={(v) => setOceanCurrentParams({ coldCurrentMaxDropCelsius: v })}
       />
       <Slider
@@ -59,6 +61,7 @@ export function OceanCurrentStepParamsSliders() {
         precision={0}
         value={oceanCurrentParams.seaIceLatitudeThresholdDeg}
         defaultValue={DEFAULT_OCEAN_CURRENT_STEP_PARAMS.seaIceLatitudeThresholdDeg}
+        helpText="基本海氷帯の赤道側下限緯度。Pasta は 70〜80°、デフォルト 70°（地球北極海の縁に近い）。"
         onChange={(v) => setOceanCurrentParams({ seaIceLatitudeThresholdDeg: v })}
       />
       <div className="param-toggle">

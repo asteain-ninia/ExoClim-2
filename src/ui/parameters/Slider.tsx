@@ -19,6 +19,12 @@ interface SliderProps {
    * 例: `EARTH_ORBITAL_PARAMS.eccentricity` を渡す。
    */
   readonly defaultValue?: number;
+  /**
+   * ヘルプ説明文（[現状.md §6 U11]、P4-35）。
+   * 指定されていれば label 横に `?` アイコンを出し、ホバー/フォーカスで
+   * ネイティブツールチップ表示。spec 引用や Pasta 出典を入れる用途。
+   */
+  readonly helpText?: string;
   readonly onChange: (value: number) => void;
 }
 
@@ -32,13 +38,28 @@ export function Slider({
   value,
   precision = 2,
   defaultValue,
+  helpText,
   onChange,
 }: SliderProps) {
   const formattedValue = value.toFixed(precision);
   return (
     <div className="slider">
       <label htmlFor={id} className="slider__label-row">
-        <span className="slider__label">{label}</span>
+        <span className="slider__label">
+          {label}
+          {helpText && (
+            <span
+              className="slider__help"
+              role="img"
+              aria-label={`ヘルプ: ${helpText}`}
+              tabIndex={0}
+              title={helpText}
+              data-testid={`slider-${id}-help`}
+            >
+              ?
+            </span>
+          )}
+        </span>
         <span className="slider__value">
           {formattedValue}
           {unit && <span className="slider__unit">{unit}</span>}

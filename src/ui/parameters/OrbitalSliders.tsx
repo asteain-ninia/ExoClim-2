@@ -23,6 +23,7 @@ export function OrbitalSliders() {
         precision={2}
         value={orbital.starLuminositySolar}
         defaultValue={EARTH_ORBITAL_PARAMS.starLuminositySolar}
+        helpText="主星の放射出力（太陽 = 1.0）。日射量・温度に直接影響。"
         onChange={(v) => setOrbital({ starLuminositySolar: v })}
       />
       <Slider
@@ -35,6 +36,7 @@ export function OrbitalSliders() {
         precision={2}
         value={orbital.semiMajorAxisAU}
         defaultValue={EARTH_ORBITAL_PARAMS.semiMajorAxisAU}
+        helpText="主星 - 惑星の平均距離（地球 = 1.0 AU）。日射量は 1/AU² で減衰。"
         onChange={(v) => setOrbital({ semiMajorAxisAU: v })}
       />
       <Slider
@@ -47,6 +49,7 @@ export function OrbitalSliders() {
         precision={0}
         value={orbital.orbitalPeriodDays}
         defaultValue={EARTH_ORBITAL_PARAMS.orbitalPeriodDays}
+        helpText="1 公転にかかる日数（地球 = 365 日）。長いと季節サイクルが緩慢になる。"
         onChange={(v) => setOrbital({ orbitalPeriodDays: v })}
       />
       <Slider
@@ -58,6 +61,7 @@ export function OrbitalSliders() {
         precision={3}
         value={orbital.eccentricity}
         defaultValue={EARTH_ORBITAL_PARAMS.eccentricity}
+        helpText="軌道の楕円度（0=円、1=放物線）。地球 = 0.017。大きいと近日点と遠日点で日射量差が出る。"
         onChange={(v) => setOrbital({ eccentricity: v })}
       />
       <Slider
@@ -70,6 +74,7 @@ export function OrbitalSliders() {
         precision={0}
         value={orbital.argumentOfPerihelionDeg}
         defaultValue={EARTH_ORBITAL_PARAMS.argumentOfPerihelionDeg}
+        helpText="近日点が春分点から見てどの位置にあるか（度）。地球 = 282.9°。季節と離心率の組合せに影響。"
         onChange={(v) => setOrbital({ argumentOfPerihelionDeg: v })}
       />
     </fieldset>
