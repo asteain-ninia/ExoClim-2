@@ -19,7 +19,7 @@ export function ClimateZoneStepParamsSliders() {
       </p>
       <Slider
         id="climate-zone-precip-dry"
-        label="ラベル『dry』降水量"
+        label="降水ラベル『乾』の月降水量"
         unit="mm/月"
         min={0}
         max={60}
@@ -27,11 +27,12 @@ export function ClimateZoneStepParamsSliders() {
         precision={0}
         value={climateZoneParams.precipitationMmByLabel.dry}
         defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.precipitationMmByLabel.dry}
+        helpText="Step 6 の dry ラベルを Step 7 で何 mm/月として量化するか（既定 10 mm/月）。Köppen B 群の判定に直接効く。"
         onChange={(v) => setClimateZoneParams({ precipitationMmByLabel: { dry: v } })}
       />
       <Slider
         id="climate-zone-precip-normal"
-        label="ラベル『normal』降水量"
+        label="降水ラベル『普通』の月降水量"
         unit="mm/月"
         min={20}
         max={150}
@@ -39,11 +40,12 @@ export function ClimateZoneStepParamsSliders() {
         precision={0}
         value={climateZoneParams.precipitationMmByLabel.normal}
         defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.precipitationMmByLabel.normal}
+        helpText="normal ラベルの月降水量（既定 60 mm/月）。Köppen Cf/Df 系の通常雨量レベル。"
         onChange={(v) => setClimateZoneParams({ precipitationMmByLabel: { normal: v } })}
       />
       <Slider
         id="climate-zone-precip-wet"
-        label="ラベル『wet』降水量"
+        label="降水ラベル『湿』の月降水量"
         unit="mm/月"
         min={60}
         max={300}
@@ -51,11 +53,12 @@ export function ClimateZoneStepParamsSliders() {
         precision={0}
         value={climateZoneParams.precipitationMmByLabel.wet}
         defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.precipitationMmByLabel.wet}
+        helpText="wet ラベルの月降水量（既定 120 mm/月）。Köppen Am の湿潤閾値に近い。"
         onChange={(v) => setClimateZoneParams({ precipitationMmByLabel: { wet: v } })}
       />
       <Slider
         id="climate-zone-precip-verywet"
-        label="ラベル『very_wet』降水量"
+        label="降水ラベル『多湿』の月降水量"
         unit="mm/月"
         min={120}
         max={500}
@@ -63,6 +66,7 @@ export function ClimateZoneStepParamsSliders() {
         precision={0}
         value={climateZoneParams.precipitationMmByLabel.very_wet}
         defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.precipitationMmByLabel.very_wet}
+        helpText="very_wet ラベルの月降水量（既定 240 mm/月）。Köppen Af 熱帯雨林の典型値。"
         onChange={(v) => setClimateZoneParams({ precipitationMmByLabel: { very_wet: v } })}
       />
       <div className="param-toggle">
@@ -133,6 +137,7 @@ export function ClimateZoneStepParamsSliders() {
         precision={1}
         value={climateZoneParams.aridReclassToDMaxAnnualTempCelsius}
         defaultValue={DEFAULT_CLIMATE_ZONE_STEP_PARAMS.aridReclassToDMaxAnnualTempCelsius}
+        helpText="年平均気温がこの値以下なら、低降水量でも乾燥扱いせず D 群（亜寒帯/大陸性）に振り戻す（既定 7°C、Worldbuilder's Log #40）。"
         onChange={(v) => setClimateZoneParams({ aridReclassToDMaxAnnualTempCelsius: v })}
       />
     </fieldset>
