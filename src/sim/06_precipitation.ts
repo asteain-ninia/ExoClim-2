@@ -773,6 +773,43 @@ export function computePrecipitation(
           !inWindward &&
           !isITCZCoastalOnshore;
 
+        // [P4-57] Siberian high (NH 高緯度内陸 winter dry): lat 45-65°N の内陸
+        // （8 セル radius で海セルなし）陸地は冬月に dry、夏月に wet（対流性）。
+        // これがないと Df 一辺倒で Dw（亜寒帯冬季少雨）が全く出ない。実 Earth
+        // では中央シベリア / モンゴル / NE 中国がこの分布。
+        // Dw 条件「夏 wettest >= 10*冬 driest」を満たすため、夏月 'wet' (120mm) /
+        // 冬月 'dry' (10mm) で ratio 12 を確保する。
+        let isHighLatInterior = false;
+        if (
+          cell.isLand &&
+          cell.latitudeDeg >= 45 &&
+          cell.latitudeDeg <= 65 &&
+          !inWarmWet &&
+          !inWindward
+        ) {
+          let allLand = true;
+          for (const [di, dj] of [[0, 8], [0, -8], [8, 0], [-8, 0]] as ReadonlyArray<
+            readonly [number, number]
+          >) {
+            const ni = i + di;
+            if (ni < 0 || ni >= rows) {
+              allLand = false;
+              break;
+            }
+            const nj = ((j + dj) % cols + cols) % cols;
+            const nCell = grid.cells[ni]?.[nj];
+            if (!nCell || !nCell.isLand) {
+              allLand = false;
+              break;
+            }
+          }
+          isHighLatInterior = allLand;
+        }
+        const isSiberianWinterDry =
+          isHighLatInterior && isWinterMonthForLatitude(m, cell.latitudeDeg);
+        const isContinentalSummerWet =
+          isHighLatInterior && !isWinterMonthForLatitude(m, cell.latitudeDeg);
+
         if (inITCZ && isWetCandidate) {
           labelRow[j] = 'very_wet';
         } else if (isWetCandidate) {
@@ -781,6 +818,9 @@ export function computePrecipitation(
           labelRow[j] = 'wet';
         } else if (isMonsoonOnshore) {
           // [P4-56] 亜熱帯モンスーン onshore wet（subtropical high dry rule より優先）
+          labelRow[j] = 'wet';
+        } else if (isContinentalSummerWet) {
+          // [P4-57] NH 高緯度内陸の夏季対流性降水（Dw 形成のため夏 wet）
           labelRow[j] = 'wet';
         } else if (inITCZ && absLat < 15) {
           // [P4-54] ITCZ 圏内の対流性降水: 深熱帯（lat<15°）に限定。
@@ -797,6 +837,8 @@ export function computePrecipitation(
         } else if (coldCurrentDry) {
           labelRow[j] = 'dry';
         } else if (isTropicalDrySeason) {
+          labelRow[j] = 'dry';
+        } else if (isSiberianWinterDry) {
           labelRow[j] = 'dry';
         } else {
           labelRow[j] = 'normal';
