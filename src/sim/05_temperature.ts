@@ -160,10 +160,12 @@ export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   snowIceFeedbackIterations: 2,
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
-  // [P4-73] cells → km へ移行。1100 km ≈ Pacific NW / 北欧 Cfb 帯の最大幅。
-  // [P4-85] subagent 3rd eval 反映で 1100 → 1500 km に拡大。中緯度西岸の
-  // 海岸補正 (warm/cold current) を内陸まで届かせて Cfb wedge 帯を確保。
-  coastalCorrectionInlandReachKm: 1500,
+  // [P4-73] cells → km へ移行。
+  // [P4-85] reach 1100 → 1500 km。
+  // [P4-87] subagent 4th eval「Dfc 38% 寡占、Cfb/Cs はお手本比 1/8」
+  // への対応で 1500 → 2000 km に再拡大。Pasta WL#28「2000 km from coast」
+  // の上限値（subagent 3rd eval 後の保守値からPasta 仕様値に合わせる）。
+  coastalCorrectionInlandReachKm: 2000,
 };
 
 /**
