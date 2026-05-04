@@ -161,7 +161,9 @@ export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
   // [P4-73] cells → km へ移行。1100 km ≈ Pacific NW / 北欧 Cfb 帯の最大幅。
-  coastalCorrectionInlandReachKm: 1100,
+  // [P4-85] subagent 3rd eval 反映で 1100 → 1500 km に拡大。中緯度西岸の
+  // 海岸補正 (warm/cold current) を内陸まで届かせて Cfb wedge 帯を確保。
+  coastalCorrectionInlandReachKm: 1500,
 };
 
 /**
