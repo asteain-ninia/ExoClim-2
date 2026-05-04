@@ -155,9 +155,15 @@ export interface TemperatureStepParams {
 
 export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   globalMeanBaselineCelsius: 15,
-  continentalityStrength: 1,
+  // [P4-88] subagent 4th eval「Dfc 38% 寡占」対応で 1.0 → 0.9 微調整。
+  // 0.8 を試したが ET が 10182 → 34520 に膨張する副作用 (P4-85) 大きく
+  // 0.9 中間値を採用。Pasta は明示数値指定なし。
+  continentalityStrength: 0.9,
   windAdvectionStrength: 0.3,
-  snowIceFeedbackIterations: 2,
+  // [P4-88] subagent 4th eval「Dfc 38% 寡占」対応で 2 → 1 反復に。
+  // 反復で雪氷帯が拡大 → アルベド↑ → 温度↓ の self-amplifying loop が
+  // 過剰に効き、北方亜寒帯 (subarctic Dfc) が広がっていた。
+  snowIceFeedbackIterations: 1,
   evapotranspirationCoefficientMmPerCelsius: 5,
   isothermIntervalCelsius: 10,
   // [P4-73] cells → km へ移行。
