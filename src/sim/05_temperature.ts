@@ -155,10 +155,10 @@ export interface TemperatureStepParams {
 
 export const DEFAULT_TEMPERATURE_STEP_PARAMS: TemperatureStepParams = {
   globalMeanBaselineCelsius: 15,
-  // [P4-88] subagent 4th eval「Dfc 38% 寡占」対応で 1.0 → 0.9 微調整。
-  // 0.8 を試したが ET が 10182 → 34520 に膨張する副作用 (P4-85) 大きく
-  // 0.9 中間値を採用。Pasta は明示数値指定なし。
-  continentalityStrength: 0.9,
+  // [P4-88] Dfc 寡占対応で 1.0 → 0.9 試行 → EF/ET 肥大化 (subagent 5th eval)。
+  // [P4-89] 5th eval 反映で 0.9 → 0.95 に戻す。Cfb 拡張効果を一部維持しつつ
+  // 極帯氷雪の過剰拡大を抑える妥協点。Pasta は明示数値指定なし。
+  continentalityStrength: 0.95,
   windAdvectionStrength: 0.3,
   // [P4-88] subagent 4th eval「Dfc 38% 寡占」対応で 2 → 1 反復に。
   // 反復で雪氷帯が拡大 → アルベド↑ → 温度↓ の self-amplifying loop が
