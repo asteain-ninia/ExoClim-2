@@ -160,6 +160,14 @@ export interface ClimateZoneStepParams {
    */
   readonly bsRingAroundBwEnabled: boolean;
   /**
+   * BWh 連続帯保証（[P4-86]、subagent 3rd eval「BWh 帯の縞状分裂」対応）。
+   *
+   * 経度方向に「BWh - X - BWh」または緯度方向に同パターンの 1-cell sandwich
+   * を BWh に丸めて、亜熱帯砂漠 zonal belt の連続性を確保する。Pasta 模式図
+   * の「lat 20-30° 連続砂漠ベルト」を視覚的に再現するための後処理。既定 true。
+   */
+  readonly bwhContinuityEnabled: boolean;
+  /**
    * §4.1.8 ITCZ 移動帯 savanna 拡張を有効化するか（[P4-81]）。
    *
    * 赤道帯近傍 (|lat| ≤ `itczMigrationLatBandDeg`) で `BWh` / `BSh` に
@@ -222,6 +230,7 @@ export const DEFAULT_CLIMATE_ZONE_STEP_PARAMS: ClimateZoneStepParams = {
   tropicalExtensionMinAnnualMeanCelsius: 22,
   tropicalExtensionMinWinterMinCelsius: 10,
   bsRingAroundBwEnabled: true,
+  bwhContinuityEnabled: true,
   itczMigrationSavannaExpansionEnabled: true,
   itczMigrationLatBandDeg: 15,
   equatorialAfProtectEnabled: true,
@@ -619,6 +628,13 @@ export function computeClimateZone(
     applyWestCoastDesertExtension(zoneCodes, grid);
   }
 
+  // [P4-86] BWh 連続帯保証: 「BWh - X - BWh」1-cell sandwich を BWh に
+  // 丸めて、亜熱帯砂漠 zonal belt の縞状分裂を解消する（subagent 3rd eval
+  // 2026-05-04）。BS リングよりも先に走らせて、リングが連続化された BWh
+  // 帯の周囲に正しく生成されるようにする。
+  if (params.bwhContinuityEnabled) {
+    applyBwhContinuity(zoneCodes);
+  }
   // §4.x [P4-55] BS リング後処理: BW セルに隣接する非 B/E ゾーン（A/C/D）を
   // BS に置換してステップ気候の遷移帯を生成。Pasta WL#37 / 教科書的に
   // 「砂漠は必ずステップに囲まれる」ためで、ring がないと A → BW の急変が
@@ -825,6 +841,50 @@ function applyMediterraneanWestCoastForce(
         codeRow[j] = 'Csa';
       } else if (cur === 'Cfb' || cur === 'Cwb' || cur === 'Cfc' || cur === 'BWk' || cur === 'BSk') {
         codeRow[j] = 'Csb';
+      }
+    }
+  }
+}
+
+/**
+ * BWh 連続帯保証（[P4-86]、subagent 3rd eval 2026-05-04）。
+ *
+ * 経度方向に「BWh - X - BWh」または緯度方向に同パターンの 1-cell sandwich
+ * を BWh に丸めて、亜熱帯砂漠 zonal belt の連続性を保つ。
+ *
+ * X が BSh (リングの一部) や Aw / Cfa などの「砂漠帯に侵入してきた湿潤」セル
+ * の場合に対象。E 群 / D 群はサンドイッチ対象外（高緯度の冷帯まで丸めると
+ * 物理的におかしいため）。
+ *
+ * 入力 `zoneCodes` の snapshot を取り、snapshot に対して判定して結果を
+ * `zoneCodes` に書き戻す（同一 pass で連鎖反応しない）。
+ */
+function applyBwhContinuity(zoneCodes: (ClimateZoneCode | null)[][]): void {
+  const rows = zoneCodes.length;
+  const cols = zoneCodes[0]?.length ?? 0;
+  const snapshot: (ClimateZoneCode | null)[][] = zoneCodes.map((row) => [...row]);
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const z = snapshot[i]![j];
+      if (!z) continue;
+      // 対象は「BWh 帯に侵入してきた」セルのみ。BSh / Aw / Cfa / BWk が候補。
+      if (z !== 'BSh' && z !== 'Aw' && z !== 'Cfa' && z !== 'BWk') continue;
+      // 経度方向 sandwich: 左右が BWh
+      const jL = (j - 1 + cols) % cols;
+      const jR = (j + 1) % cols;
+      const zL = snapshot[i]![jL];
+      const zR = snapshot[i]![jR];
+      if (zL === 'BWh' && zR === 'BWh') {
+        zoneCodes[i]![j] = 'BWh';
+        continue;
+      }
+      // 緯度方向 sandwich: 上下が BWh（高緯度側 + 低緯度側）
+      if (i > 0 && i < rows - 1) {
+        const zU = snapshot[i - 1]![j];
+        const zD = snapshot[i + 1]![j];
+        if (zU === 'BWh' && zD === 'BWh') {
+          zoneCodes[i]![j] = 'BWh';
+        }
       }
     }
   }
