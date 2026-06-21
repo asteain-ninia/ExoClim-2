@@ -23,3 +23,12 @@ tests/fixtures-external/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# --- third-party reference material (Worldbuilding Pasta / geographico) : keep local, never publish (2026-06-21) ---
+docs/Pasta Part VIb Step 7 Climate Zone/
+docs/Pasta Part VIb Step 7 Climate Zone.zip
+docs/Worldbuilder's Log *.txt
+docs/reference/geographico_imgs/
+docs/reference/geographico_climate.png
+docs/reference/geographico_climate_only.png
+docs/reference/geographico_terrain.png
