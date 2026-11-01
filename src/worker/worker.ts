@@ -6,52 +6,20 @@
 //
 // メッセージプロトコル:
 //   inbound  WorkerGridUpdateRequest | WorkerRunRequest
-//   outbound WorkerResponse
+//   outbound WorkerOutboundMessage（成功 `{ id, output }` / 失敗 `{ id, error }`）
 //
 // Grid は postMessage の structured clone コストが大きいため、bridge 側で参照変化を
-// 検出して `grid-update` で送り、本 worker 側でキャッシュする。run メッセージは
-// planet と itczParams のみを含み、Grid はキャッシュから補う。
+// 検出して `grid-update` で送り、Worker 側でキャッシュする。run メッセージは
+// planet と各 Step パラメータのみを含み、Grid はキャッシュから補う。
+// 処理本体は node 環境でテストできるよう [src/worker/workerHandler.ts] に分離している。
 
-import type { Grid } from '@/domain';
-import type {
-  WorkerInboundMessage,
-  WorkerOutboundMessage,
-} from './bridge';
-import {
-  EMPTY_PIPELINE_CACHE,
-  runPipeline,
-  type PipelineCache,
-  type PipelineInputs,
-} from './pipeline';
+import type { WorkerInboundMessage } from './bridge';
+import { createWorkerMessageHandler } from './workerHandler';
 
-let currentGrid: Grid | null = null;
-let cache: PipelineCache = EMPTY_PIPELINE_CACHE;
+const handleMessage = createWorkerMessageHandler((response) => {
+  self.postMessage(response);
+});
 
 self.addEventListener('message', (event: MessageEvent<WorkerInboundMessage>) => {
-  const message = event.data;
-  if (message.type === 'grid-update') {
-    currentGrid = message.grid;
-    return;
-  }
-  if (message.type === 'run') {
-    if (!currentGrid) {
-      // bridge は run 前に必ず grid-update を送る契約だが、安全側で no-op にする。
-      return;
-    }
-    const inputs: PipelineInputs = {
-      planet: message.planet,
-      grid: currentGrid,
-      itczParams: message.itczParams,
-      windBeltParams: message.windBeltParams,
-      oceanCurrentParams: message.oceanCurrentParams,
-      airflowParams: message.airflowParams,
-      temperatureParams: message.temperatureParams,
-      precipitationParams: message.precipitationParams,
-      climateZoneParams: message.climateZoneParams,
-    };
-    const result = runPipeline(inputs, cache);
-    cache = result.cache;
-    const response: WorkerOutboundMessage = { id: message.id, output: result.output };
-    self.postMessage(response);
-  }
+  handleMessage(event.data);
 });
