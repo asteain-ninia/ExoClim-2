@@ -81,8 +81,19 @@ export function connectStoresToBridge(
   //   - パイプラインが実行中なら新しい呼び出しは pendingDirty フラグを立てるだけ。
   //   - 実行完了時にフラグが立っていれば、最新の params で再実行する（do-while ループ）。
   //   - スライダーを高速ドラッグしても backlog が積まれず、最後の入力に追従する。
+  //   - 実行が失敗しても isRunning は必ず戻し、失敗中に入った変更（pendingDirty）は再実行する。
+  //     bridge.run の Promise が決着しないと isRunning が立ったままになり再計算が止まるため、
+  //     bridge 側は失敗時に必ず reject する契約（[src/worker/bridge.ts]）。
   let isRunning = false;
   let pendingDirty = false;
+
+  const reportError = (message: string): void => {
+    if (options.notificationsStore) {
+      options.notificationsStore.getState().push('error', message);
+    } else {
+      console.error('[bridge error]', message);
+    }
+  };
 
   const runPipelineFromCurrentParams = async (): Promise<void> => {
     if (isRunning) {
@@ -94,22 +105,33 @@ export function connectStoresToBridge(
     try {
       do {
         pendingDirty = false;
-        const params = paramsStore.getState();
-        const grid = resolveGrid(params.planet.terrain);
-        resultsStore.getState().setGrid(grid);
-        const inputs: PipelineInputs = {
-          planet: params.planet,
-          grid,
-          itczParams: params.itczParams,
-          windBeltParams: params.windBeltParams,
-          oceanCurrentParams: params.oceanCurrentParams,
-          airflowParams: params.airflowParams,
-          temperatureParams: params.temperatureParams,
-          precipitationParams: params.precipitationParams,
-          climateZoneParams: params.climateZoneParams,
-        };
-        const output = await bridge.run(inputs);
-        resultsStore.getState().setOutput(output);
+        try {
+          const params = paramsStore.getState();
+          const grid = resolveGrid(params.planet.terrain);
+          resultsStore.getState().setGrid(grid);
+          const inputs: PipelineInputs = {
+            planet: params.planet,
+            grid,
+            itczParams: params.itczParams,
+            windBeltParams: params.windBeltParams,
+            oceanCurrentParams: params.oceanCurrentParams,
+            airflowParams: params.airflowParams,
+            temperatureParams: params.temperatureParams,
+            precipitationParams: params.precipitationParams,
+            climateZoneParams: params.climateZoneParams,
+          };
+          let output: Awaited<ReturnType<PipelineBridge['run']>>;
+          try {
+            output = await bridge.run(inputs);
+          } catch {
+            // bridge は失敗を onError で通知済み（二重通知しない）。results は前回値を維持する。
+            continue;
+          }
+          resultsStore.getState().setOutput(output);
+        } catch (e) {
+          // bridge 外（地形生成・results 反映）の例外
+          reportError(`再計算に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+        }
       } while (pendingDirty);
     } finally {
       isRunning = false;
@@ -118,13 +140,7 @@ export function connectStoresToBridge(
   };
 
   // bridge のエラーを notifications store に流す
-  const unsubscribeError = bridge.onError((message) => {
-    if (options.notificationsStore) {
-      options.notificationsStore.getState().push('error', message);
-    } else {
-      console.error('[bridge error]', message);
-    }
-  });
+  const unsubscribeError = bridge.onError(reportError);
 
   // 初回実行（現在の params で results を埋める）
   void runPipelineFromCurrentParams();

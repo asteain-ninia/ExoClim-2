@@ -4,7 +4,8 @@
 //
 // テスト方針:
 //   - 直接ブリッジ (createDirectPipelineBridge) は単体テストで網羅。
-//   - Worker ブリッジ (createWorkerPipelineBridge) は dev サーバ上で手動確認
+//   - Worker ブリッジのプロトコル処理 (createPipelineBridgeOverWorker) は偽 Worker で単体テスト。
+//     実 Worker の起動 (createWorkerPipelineBridge) は dev サーバ / E2E で確認
 //     （Vitest は node 環境のため Web Worker のフルセット動作は再現困難）。
 
 import type { Grid, PlanetParams } from '@/domain';
@@ -107,87 +108,152 @@ interface WorkerRunRequest {
 
 export type WorkerInboundMessage = WorkerGridUpdateRequest | WorkerRunRequest;
 
-interface WorkerResponse {
+interface WorkerSuccessResponse {
   readonly id: number;
   readonly output: PipelineOutput;
 }
 
-export type WorkerOutboundMessage = WorkerResponse;
+/** Worker 内で pipeline が例外を投げた場合の応答。`error` は例外メッセージ。 */
+interface WorkerErrorResponse {
+  readonly id: number;
+  readonly error: string;
+}
+
+export type WorkerOutboundMessage = WorkerSuccessResponse | WorkerErrorResponse;
+
+/**
+ * {@link createPipelineBridgeOverWorker} が必要とする Worker の最小インターフェース。
+ * 本番は `Worker`、単体テストは EventTarget ベースの偽 Worker を渡す。
+ */
+export interface WorkerLike {
+  postMessage(message: WorkerInboundMessage): void;
+  addEventListener(
+    type: 'message',
+    listener: (event: MessageEvent<WorkerOutboundMessage>) => void,
+  ): void;
+  addEventListener(type: 'error', listener: (event: ErrorEvent) => void): void;
+  addEventListener(type: 'messageerror', listener: (event: MessageEvent) => void): void;
+  terminate(): void;
+}
+
+interface PendingRequest {
+  readonly resolve: (output: PipelineOutput) => void;
+  readonly reject: (error: Error) => void;
+}
 
 /**
  * Web Worker ブリッジ。Vite 6 の `new Worker(new URL(...), { type: 'module' })` 形式で起動する。
  * 用途: 本番アプリ。UI スレッドのブロッキング回避。
  *
  * 注意: 本関数は browser 環境を前提とする。Vitest（node 環境）では呼び出さない。
+ *   プロトコル処理は {@link createPipelineBridgeOverWorker} に分離してあり、そちらを単体テストする。
  */
 export function createWorkerPipelineBridge(): PipelineBridge {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), {
     type: 'module',
   });
+  return createPipelineBridgeOverWorker(worker);
+}
+
+/**
+ * 任意の {@link WorkerLike} 上に pipeline ブリッジのプロトコルを実装する。
+ *
+ * エラー時の契約（未決着の Promise を残さない）:
+ *   - Worker が `{ id, error }` を返したら、その要求の Promise を reject し onError を呼ぶ。
+ *   - Worker の `error` / `messageerror` イベントでは、応答が来ない可能性があるため
+ *     保留中の全要求を reject し onError を呼ぶ。
+ *   - dispose() 時も保留中の全要求を reject する。
+ * Promise が決着しないと、呼び出し側（store/connection）の single-in-flight フラグが
+ * 立ったままになり、以後の再計算が一切起動しなくなる。
+ */
+export function createPipelineBridgeOverWorker(worker: WorkerLike): PipelineBridge {
   let nextRequestId = 0;
   /**
    * 直近 Worker に送信した Grid 参照。新規 run 時に inputs.grid と参照比較し、
    * 同一なら再送しない（postMessage の structured clone コストを削減）。
    */
   let lastSentGrid: Grid | null = null;
-  const pendingRequests = new Map<number, (output: PipelineOutput) => void>();
+  const pendingRequests = new Map<number, PendingRequest>();
   const errorHandlers = new Set<(message: string) => void>();
 
   const fireError = (message: string): void => {
     for (const h of errorHandlers) h(message);
   };
 
+  const rejectAllPending = (message: string): void => {
+    const requests = [...pendingRequests.values()];
+    pendingRequests.clear();
+    for (const request of requests) request.reject(new Error(message));
+  };
+
   worker.addEventListener('message', (e: MessageEvent<WorkerOutboundMessage>) => {
-    const { id, output } = e.data;
-    const resolver = pendingRequests.get(id);
-    if (resolver) {
-      pendingRequests.delete(id);
-      resolver(output);
+    const response = e.data;
+    const request = pendingRequests.get(response.id);
+    if (!request) return;
+    pendingRequests.delete(response.id);
+    if ('error' in response) {
+      const message = `パイプライン計算エラー: ${response.error}`;
+      fireError(message);
+      request.reject(new Error(message));
+      return;
     }
+    request.resolve(response.output);
   });
 
-  // Worker 内例外（非同期で捕捉できないもの）。message と filename / lineno を整形。
+  // Worker 内の未捕捉例外。message と filename / lineno を整形。
   worker.addEventListener('error', (e: ErrorEvent) => {
     const msg = e.message || 'Worker 内で未捕捉エラー';
-    fireError(`Worker エラー: ${msg}${e.filename ? ` (${e.filename}:${e.lineno})` : ''}`);
+    const message = `Worker エラー: ${msg}${e.filename ? ` (${e.filename}:${e.lineno})` : ''}`;
+    fireError(message);
+    rejectAllPending(message);
   });
 
-  // postMessage の serialization 失敗（循環参照など）。
+  // postMessage の serialization 失敗（循環参照など）。どの要求への応答か特定できない。
   worker.addEventListener('messageerror', () => {
-    fireError('Worker からの応答メッセージが解読できませんでした');
+    const message = 'Worker からの応答メッセージが解読できませんでした';
+    fireError(message);
+    rejectAllPending(message);
   });
 
   return {
     run: (inputs) => {
-      if (inputs.grid !== lastSentGrid) {
-        lastSentGrid = inputs.grid;
-        const gridMessage: WorkerGridUpdateRequest = {
-          type: 'grid-update',
-          grid: inputs.grid,
-        };
-        worker.postMessage(gridMessage);
-      }
       const id = ++nextRequestId;
-      return new Promise<PipelineOutput>((resolve) => {
-        pendingRequests.set(id, resolve);
-        const runMessage: WorkerRunRequest = {
-          type: 'run',
-          id,
-          planet: inputs.planet,
-          itczParams: inputs.itczParams,
-          windBeltParams: inputs.windBeltParams,
-          oceanCurrentParams: inputs.oceanCurrentParams,
-          airflowParams: inputs.airflowParams,
-          temperatureParams: inputs.temperatureParams,
-          precipitationParams: inputs.precipitationParams,
-          climateZoneParams: inputs.climateZoneParams,
-        };
-        worker.postMessage(runMessage);
+      return new Promise<PipelineOutput>((resolve, reject) => {
+        try {
+          if (inputs.grid !== lastSentGrid) {
+            const gridMessage: WorkerGridUpdateRequest = {
+              type: 'grid-update',
+              grid: inputs.grid,
+            };
+            worker.postMessage(gridMessage);
+            lastSentGrid = inputs.grid;
+          }
+          const runMessage: WorkerRunRequest = {
+            type: 'run',
+            id,
+            planet: inputs.planet,
+            itczParams: inputs.itczParams,
+            windBeltParams: inputs.windBeltParams,
+            oceanCurrentParams: inputs.oceanCurrentParams,
+            airflowParams: inputs.airflowParams,
+            temperatureParams: inputs.temperatureParams,
+            precipitationParams: inputs.precipitationParams,
+            climateZoneParams: inputs.climateZoneParams,
+          };
+          pendingRequests.set(id, { resolve, reject });
+          worker.postMessage(runMessage);
+        } catch (e) {
+          // postMessage の structured clone 失敗（DataCloneError）など
+          pendingRequests.delete(id);
+          const message = `Worker への送信に失敗しました: ${e instanceof Error ? e.message : String(e)}`;
+          fireError(message);
+          reject(new Error(message));
+        }
       });
     },
     dispose: () => {
       worker.terminate();
-      pendingRequests.clear();
+      rejectAllPending('pipeline ブリッジは破棄されました');
       errorHandlers.clear();
       lastSentGrid = null;
     },
