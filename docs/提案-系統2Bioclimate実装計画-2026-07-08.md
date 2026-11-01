@@ -1,6 +1,7 @@
 # 提案 — 系統2「Pasta Bioclimate System」実装計画（2026-07-08）
 
 > **公開時の注記（2026-11-01）**: ExoClim-2 の開発は終了し、後継の ExoClim-3 に移っています。本書は当時の未採用案の記録です。本文が参照する一次資料の書き起こし（`docs/Worldbuilder's Log *.txt`、`docs/Pasta Part VIb Step 7 Climate Zone/`、その中の `transcript.md`）とお手本画像（`geographico_*.png`）は、第三者資料とその関連物のため公開していません。旧 ExoClim（`_archive/ExoClim-/`、旧現状.md など）も本リポジトリにはありません。
+>
 > **位置づけ**: 本書は**未確定の提案文書**であり、仕様ではない。作成: Claude Fable 5（subagent）、2026-07-08。調査は **READ-ONLY**、実装は行っていない（本ファイル新規作成以外に既存ファイルの変更・削除なし）。採用時は各項目を [docs/spec/07_気候帯.md §4.2 / §7](spec/07_気候帯.md) の未確定論点から本文へ昇格させ、[現状.md §5](../現状.md) の 5 番目タスクに紐付けること。
 >
 > **一次資料の取り扱い**: GDD/HDD/Ar/Evr の算出式は Worldbuilding Pasta の一次記事（下記 §0）から WebFetch/WebSearch で取得した。取得できた値は【確認済】、取得できなかった／要約モデルの読みが記事間で揺れた値は【要一次再読】と明記する。**推測で数式・係数を埋めていない。** 数式・係数・URL は改変していない。

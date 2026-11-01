@@ -1,6 +1,7 @@
 # 提案 — 海流 agent-based tracing 完全移植計画（2026-07-07）
 
 > **公開時の注記（2026-11-01）**: ExoClim-2 の開発は終了し、後継の ExoClim-3 に移っています。本書は当時の未採用案の記録です。本文が参照する一次資料の書き起こし（`docs/Worldbuilder's Log *.txt`、`docs/Pasta Part VIb Step 7 Climate Zone/`、その中の `transcript.md`）とお手本画像（`geographico_*.png`）は、第三者資料とその関連物のため公開していません。旧 ExoClim（`_archive/ExoClim-/`、旧現状.md など）も本リポジトリにはありません。
+>
 > **位置づけ**: これは**未確定の提案文書**です。仕様ではありません。採用する場合は、各Phaseを `現状.md` §2.3 にタスク登録し、確定した設計判断のみを `docs/spec/03_海流.md` へ反映してください（指示.md「永続文書に一時情報を書かない」原則に従い、本書は docs/ 直下の提案として置きます）。
 > **作成経緯**: 分析はOpus調査エージェント（旧新両実装の突き合わせ、READ-ONLY）、計画判断はFable 5。実装は行っていません。
 > **参照記法**: OLD = `_archive/ExoClim-/services/physics/ocean.ts`（1040行）/ NEW = `src/sim/03_ocean_current.ts`（1898行）
