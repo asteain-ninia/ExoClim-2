@@ -96,6 +96,9 @@ const SNOW_ICE_ADDITIONAL_COOLING_CELSIUS = 5;
 /** 海岸距離計算で「内陸」と判定するセル数。これ以上海から離れた陸地で continentality 最大。 */
 const CONTINENTAL_INTERIOR_CELL_THRESHOLD = 10;
 
+/** 海岸補正の内陸伝播で探索する窓の片側上限セル数（緯度・経度とも。極帯での発散防止）。 */
+const COASTAL_PROPAGATION_MAX_REACH_CELLS = 60;
+
 /** 風移流補正の参照風速（m/s）。風速がこれと一致するときに混合率 = strength。 */
 const WIND_ADVECTION_REFERENCE_SPEED_MPS = 5;
 
@@ -399,9 +402,17 @@ function computeDistanceToOcean(grid: Grid): number[][] {
  * [P4-73] 引数を **km ベース**に変更。各陸セルでその緯度に応じた reach (cells) を
  * 算出することで、grid 解像度や緯度に依らず一定の物理距離を保つ。
  *
- * アルゴリズム: 各陸セルから (2*reach+1)^2 の窓を Chebyshev 距離で走査し、
- * 窓内の海セルの correction × decay の中で **絶対値最大** の符号付き値を採用する。
- * 経度はラップ、緯度はクランプ。距離も km 換算（lat 方向 = 一定、lon 方向 = cos 補正）。
+ * 定義: 各陸セルについて、(2*reachLat+1)×(2*reachLon+1) の窓（reach は陸セル側の
+ * 緯度で決まり、各 60 セルでクランプ）に入る海セルの correction × decay のうち
+ * **絶対値最大** の符号付き値を採用する。絶対値が同値のときは窓走査順
+ * （di 昇順 → dj 昇順）で先に現れる海セルを採る。経度はラップ、緯度はクランプ。
+ * 距離は km 換算の Chebyshev 距離（lat 方向 = 一定、lon 方向 = 陸セル緯度の cos 補正）。
+ *
+ * 実装: 陸セルごとに窓を走査する gather 方式は陸セル数 × 窓面積（0.5° で約 8.8 万 ×
+ * 最大 121²）となり重いため、correction ≠ 0 の海セル（ソース、0.5° で約 9 千）から
+ * 窓内の陸セルへ scatter する。同値時の優先順位は窓オフセット (di, dj) の辞書順キーで
+ * 比較し、gather 方式と bit 単位で同一の結果を返す（tests/unit/sim/05_temperature.test.ts
+ * の参照実装比較テストで担保）。
  *
  * 海セルは元の correction を保持。reachKm=0 なら何もしない。
  */
@@ -419,49 +430,81 @@ function propagateCoastalCorrectionInland(
     out[i] = sourceRow ? Array.from(sourceRow) : new Array<number>(cols).fill(0);
   }
   if (reachKm <= 0) return out;
-  // 緯度方向 reach は緯度依存なし: km / (resolutionDeg × 111.32)
-  const reachLatCells = Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT));
+  // 緯度方向 reach は緯度依存なし: km / (resolutionDeg × 111.32)。
+  // 性能上限を 60 セルでクランプ（極帯で発散防止）。
+  const reachLatCells = Math.min(
+    Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT)),
+    COASTAL_PROPAGATION_MAX_REACH_CELLS,
+  );
+  // 陸セル（伝播先）行ごとの緯度と lon 方向 reach（cos 補正）
+  const latDegByRow = new Float64Array(rows);
+  const reachLonCellsByRow = new Int32Array(rows);
   for (let i = 0; i < rows; i++) {
-    const cellRow = grid.cells[i];
-    if (!cellRow) continue;
-    // 当該緯度行の lon 方向 reach (cos 補正)
-    const latDeg = cellRow[0]?.latitudeDeg ?? 0;
+    const latDeg = grid.cells[i]?.[0]?.latitudeDeg ?? 0;
     const cosLat = Math.max(0.05, Math.cos(latDeg * Math.PI / 180));
-    const reachLonCells = Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT * cosLat));
-    // 探索窓を緯度別に変えるが、性能上限を 60 セルでクランプ（極帯で発散防止）
-    const reachLatCellsClamped = Math.min(reachLatCells, 60);
-    const reachLonCellsClamped = Math.min(reachLonCells, 60);
-    for (let j = 0; j < cols; j++) {
-      const cell = cellRow[j];
-      if (!cell || !cell.isLand) continue;
-      let bestAbs = 0;
-      let bestSigned = 0;
-      for (let di = -reachLatCellsClamped; di <= reachLatCellsClamped; di++) {
-        const ni = i + di;
-        if (ni < 0 || ni >= rows) continue;
-        const nRow = grid.cells[ni];
-        if (!nRow) continue;
-        const corrRow = oceanCorrection[ni];
-        if (!corrRow) continue;
-        for (let dj = -reachLonCellsClamped; dj <= reachLonCellsClamped; dj++) {
-          const nj = ((j + dj) % cols + cols) % cols;
-          const nCell = nRow[nj];
-          if (!nCell || nCell.isLand) continue;
-          const sourceCorr = corrRow[nj] ?? 0;
-          if (sourceCorr === 0) continue;
-          // km 距離での減衰計算（より物理的）
+    latDegByRow[i] = latDeg;
+    reachLonCellsByRow[i] = Math.min(
+      Math.ceil(reachKm / (resolutionDeg * KM_PER_DEG_LAT * cosLat)),
+      COASTAL_PROPAGATION_MAX_REACH_CELLS,
+    );
+  }
+  // 陸セルごとの暫定最良値。key は窓オフセット (di, dj) の辞書順（小さいほど走査順で先）。
+  // di, dj はいずれも陸セル基準の「海セル − 陸セル」オフセット。
+  const keyStride = 2 * COASTAL_PROPAGATION_MAX_REACH_CELLS + 1;
+  const bestAbs = new Float64Array(rows * cols);
+  const bestSigned = new Float64Array(rows * cols);
+  const bestKey = new Int32Array(rows * cols).fill(0x7fffffff);
+  for (let si = 0; si < rows; si++) {
+    const sourceCellRow = grid.cells[si];
+    const corrRow = oceanCorrection[si];
+    if (!sourceCellRow || !corrRow) continue;
+    for (let sj = 0; sj < cols; sj++) {
+      const sourceCell = sourceCellRow[sj];
+      if (!sourceCell || sourceCell.isLand) continue;
+      const sourceCorr = corrRow[sj] ?? 0;
+      if (sourceCorr === 0) continue;
+      const tiMin = Math.max(0, si - reachLatCells);
+      const tiMax = Math.min(rows - 1, si + reachLatCells);
+      for (let ti = tiMin; ti <= tiMax; ti++) {
+        const targetCellRow = grid.cells[ti];
+        if (!targetCellRow) continue;
+        const di = si - ti;
+        const reachLonCells = reachLonCellsByRow[ti]!;
+        const latDeg = latDegByRow[ti]!;
+        const rowOffset = ti * cols;
+        const keyBase = (di + reachLatCells) * keyStride + reachLonCells;
+        for (let dj = -reachLonCells; dj <= reachLonCells; dj++) {
+          const tj = ((sj - dj) % cols + cols) % cols;
+          const targetCell = targetCellRow[tj];
+          if (!targetCell || !targetCell.isLand) continue;
+          // km 距離での減衰計算（陸セル側の緯度で cos 補正）
           const km = cellsToKm(di, dj, resolutionDeg, latDeg);
           if (km > reachKm) continue;
           const decay = Math.max(0, 1 - km / reachKm);
           const weighted = sourceCorr * decay;
           const absVal = Math.abs(weighted);
-          if (absVal > bestAbs) {
-            bestAbs = absVal;
-            bestSigned = weighted;
+          const idx = rowOffset + tj;
+          const prevAbs = bestAbs[idx]!;
+          if (absVal > prevAbs) {
+            bestAbs[idx] = absVal;
+            bestSigned[idx] = weighted;
+            bestKey[idx] = keyBase + dj;
+          } else if (absVal === prevAbs && absVal > 0 && keyBase + dj < bestKey[idx]!) {
+            bestSigned[idx] = weighted;
+            bestKey[idx] = keyBase + dj;
           }
         }
       }
-      out[i]![j] = bestSigned;
+    }
+  }
+  for (let i = 0; i < rows; i++) {
+    const cellRow = grid.cells[i];
+    if (!cellRow) continue;
+    const outRow = out[i]!;
+    for (let j = 0; j < cols; j++) {
+      const cell = cellRow[j];
+      if (!cell || !cell.isLand) continue;
+      outRow[j] = bestSigned[i * cols + j]!;
     }
   }
   return out;
@@ -489,6 +532,12 @@ function buildInitialMonthlyTemperatureCelsius(
   const rows = grid.latitudeCount;
   const cols = grid.longitudeCount;
   const monthly: number[][][] = new Array(MONTHS_PER_YEAR);
+  // Step 3 は季節依存のない correction を 12 ヶ月で同一参照として渡す（month12）。
+  // 伝播は入力のみで決まる純粋計算なので、入力参照ごとに 1 回だけ計算して再利用する。
+  const extendedCorrectionBySource = new Map<
+    ReadonlyArray<ReadonlyArray<number>>,
+    number[][]
+  >();
 
   for (let m = 0; m < MONTHS_PER_YEAR; m++) {
     const monthMap: number[][] = new Array(rows);
@@ -497,13 +546,18 @@ function buildInitialMonthlyTemperatureCelsius(
     // 伝播させた拡張マップ（[現状.md ユーザ指摘 2026-05-03、P4-50]）。
     // 旧来は陸セルの correction が常に 0 → 同緯度で東西温度差が無く、Step 7 で
     // 同色の気候帯ラベルになる症状の主因の 1 つだった。
-    const extendedCorrection = coastalCorrection
-      ? propagateCoastalCorrectionInland(
+    let extendedCorrection: number[][] | null = null;
+    if (coastalCorrection) {
+      extendedCorrection = extendedCorrectionBySource.get(coastalCorrection) ?? null;
+      if (!extendedCorrection) {
+        extendedCorrection = propagateCoastalCorrectionInland(
           grid,
           coastalCorrection,
           coastalCorrectionInlandReachKm,
-        )
-      : null;
+        );
+        extendedCorrectionBySource.set(coastalCorrection, extendedCorrection);
+      }
+    }
     for (let i = 0; i < rows; i++) {
       const cellRow = grid.cells[i];
       const base = latByMonthBase[i]?.[m] ?? 0;
